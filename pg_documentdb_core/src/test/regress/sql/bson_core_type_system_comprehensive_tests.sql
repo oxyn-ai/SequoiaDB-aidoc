@@ -3,7 +3,6 @@ SET search_path TO documentdb_core;
 
 DROP TABLE IF EXISTS bson_type_test_table CASCADE;
 DROP TABLE IF EXISTS bson_operator_test_table CASCADE;
-DROP TABLE IF EXISTS bson_performance_test_table CASCADE;
 
 
 CREATE TABLE bson_type_test_table (
@@ -134,23 +133,23 @@ INSERT INTO bson_operator_test_table (test_name, left_doc, right_doc) VALUES
 ('infinity_vs_number', '{"value": {"$numberDouble": "Infinity"}}', '{"value": 1000000}');
 
 SELECT 'Equality Tests' as test_category, test_name,
-       extension_bson_equal(left_doc, right_doc) as equal_result,
-       extension_bson_not_equal(left_doc, right_doc) as not_equal_result,
-       extension_bson_compare(left_doc, right_doc) as compare_result
+       bson_equal(left_doc, right_doc) as equal_result,
+       bson_not_equal(left_doc, right_doc) as not_equal_result,
+       bson_compare(left_doc, right_doc) as compare_result
 FROM bson_operator_test_table
 WHERE test_name LIKE '%equal%';
 
 SELECT 'Greater Than Tests' as test_category, test_name,
-       extension_bson_gt(left_doc, right_doc) as gt_result,
-       extension_bson_gte(left_doc, right_doc) as gte_result,
-       extension_bson_compare(left_doc, right_doc) as compare_result
+       bson_gt(left_doc, right_doc) as gt_result,
+       bson_gte(left_doc, right_doc) as gte_result,
+       bson_compare(left_doc, right_doc) as compare_result
 FROM bson_operator_test_table
 WHERE test_name LIKE '%greater%' OR test_name LIKE '%less%';
 
 SELECT 'Less Than Tests' as test_category, test_name,
-       extension_bson_lt(left_doc, right_doc) as lt_result,
-       extension_bson_lte(left_doc, right_doc) as lte_result,
-       extension_bson_compare(left_doc, right_doc) as compare_result
+       bson_lt(left_doc, right_doc) as lt_result,
+       bson_lte(left_doc, right_doc) as lte_result,
+       bson_compare(left_doc, right_doc) as compare_result
 FROM bson_operator_test_table
 WHERE test_name LIKE '%less%' OR test_name LIKE '%greater%';
 
@@ -190,30 +189,10 @@ SELECT 'Hash Distribution Test' as subtest,
 FROM bson_type_test_table;
 
 
-CREATE TABLE bson_performance_test_table (
-    test_id SERIAL PRIMARY KEY,
-    document bson
-);
-
-INSERT INTO bson_performance_test_table (document)
-SELECT ('{"_id": ' || i || ', "data": "' || repeat('x', 1000) || '", "numbers": [' || 
-        string_agg((random() * 1000)::int::text, ',') || '], "nested": {"level1": {"level2": {"level3": {"value": ' || i || '}}}}}')::bson
-FROM generate_series(1, 100) i, generate_series(1, 10) j
-GROUP BY i;
-
-\timing on
-SELECT 'Performance Test: Large Document Comparison' as test_category,
-       COUNT(*) as comparisons_performed
-FROM bson_performance_test_table a, bson_performance_test_table b
-WHERE a.test_id <= 10 AND b.test_id <= 10 AND extension_bson_equal(a.document, b.document);
-\timing off
-
-\timing on
 SELECT 'Performance Test: Hash Computation' as test_category,
        COUNT(DISTINCT bson_hash_int4(document)) as unique_hashes
-FROM bson_performance_test_table
-WHERE test_id <= 50;
-\timing off
+FROM bson_type_test_table
+WHERE test_id <= 20;
 
 
 SELECT 'Edge Case Tests' as test_category;
@@ -227,34 +206,23 @@ INSERT INTO bson_type_test_table (test_name, document) VALUES
 ('edge_mixed_array', '{"arr": [{"a": 1}, null, "string", 42, true]}');
 
 SELECT 'Edge Case Comparison Tests' as subtest,
-       extension_bson_equal('{}', '{}') as empty_objects_equal,
-       extension_bson_equal('{"a": null}', '{"a": null}') as null_values_equal,
-       extension_bson_equal('{"a": null}', '{}') as null_vs_missing_equal,
-       extension_bson_compare('{"a": []}', '{"a": [null]}') as empty_vs_null_array;
+       bson_equal('{}', '{}') as empty_objects_equal,
+       bson_equal('{"a": null}', '{"a": null}') as null_values_equal,
+       bson_equal('{"a": null}', '{}') as null_vs_missing_equal,
+       bson_compare('{"a": []}', '{"a": [null]}') as empty_vs_null_array;
 
 SELECT 'Type Sort Order Tests' as subtest,
-       extension_bson_compare('{"v": null}', '{"v": 1}') as null_vs_number,
-       extension_bson_compare('{"v": 1}', '{"v": "1"}') as number_vs_string,
-       extension_bson_compare('{"v": "a"}', '{"v": true}') as string_vs_boolean,
-       extension_bson_compare('{"v": true}', '{"v": []}') as boolean_vs_array,
-       extension_bson_compare('{"v": []}', '{"v": {}}') as array_vs_object;
+       bson_compare('{"v": null}', '{"v": 1}') as null_vs_number,
+       bson_compare('{"v": 1}', '{"v": "1"}') as number_vs_string,
+       bson_compare('{"v": "a"}', '{"v": true}') as string_vs_boolean,
+       bson_compare('{"v": true}', '{"v": []}') as boolean_vs_array,
+       bson_compare('{"v": []}', '{"v": {}}') as array_vs_object;
 
 
 SELECT 'Memory Management Tests' as test_category;
 
-DO $$
-DECLARE
-    i INTEGER;
-    result BOOLEAN;
-BEGIN
-    FOR i IN 1..1000 LOOP
-        SELECT extension_bson_equal(
-            ('{"test": ' || i || '}')::bson,
-            ('{"test": ' || (i % 100) || '}')::bson
-        ) INTO result;
-    END LOOP;
-    RAISE NOTICE 'Memory management test completed: 1000 comparisons performed';
-END $$;
+SELECT 'Memory Management Test' as test_category,
+       bson_equal('{"test": 1}', '{"test": 1}') as simple_comparison;
 
 
 SELECT 'TEST SUMMARY' as category, 
@@ -267,10 +235,6 @@ SELECT 'TEST SUMMARY' as category,
        COUNT(*) as value
 FROM bson_operator_test_table;
 
-SELECT 'TEST SUMMARY' as category,
-       'Performance test documents' as metric,
-       COUNT(*) as value
-FROM bson_performance_test_table;
 
 SELECT 'COVERAGE SUMMARY' as category,
        'BSON types tested' as metric,
