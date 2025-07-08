@@ -510,13 +510,1339 @@ SELECT documentdb_api.drop_collection('testdb', 'testcol');
 
 ## 4. 功能模块详细说明
 
-[继续包含所有功能模块详细说明内容...]
+DocumentDB 系统由多个核心功能模块组成，每个模块负责特定的功能领域。本章节详细介绍各个功能模块的架构、功能和使用方法。
+
+### 4.1 pg_documentdb_core 核心扩展模块
+
+#### 4.1.1 模块概述
+
+`pg_documentdb_core` 是 DocumentDB 的基础扩展模块，为 PostgreSQL 引入了 BSON 数据类型支持和基础操作功能。该模块提供了文档数据库操作的核心基础设施。
+
+**主要功能**:
+- BSON 数据类型定义和操作
+- 错误处理和诊断工具
+- 共享功能库
+- 基础数据结构支持
+
+#### 4.1.2 BSON 数据类型支持
+
+**BSON 类型定义**:
+```c
+// BSON 基础类型枚举
+typedef enum bson_type_t {
+    BSON_TYPE_EOD = 0x00,
+    BSON_TYPE_DOUBLE = 0x01,
+    BSON_TYPE_UTF8 = 0x02,
+    BSON_TYPE_DOCUMENT = 0x03,
+    BSON_TYPE_ARRAY = 0x04,
+    BSON_TYPE_BINARY = 0x05,
+    BSON_TYPE_OBJECTID = 0x07,
+    BSON_TYPE_BOOL = 0x08,
+    BSON_TYPE_DATE_TIME = 0x09,
+    BSON_TYPE_NULL = 0x0A,
+    BSON_TYPE_REGEX = 0x0B,
+    BSON_TYPE_INT32 = 0x10,
+    BSON_TYPE_TIMESTAMP = 0x11,
+    BSON_TYPE_INT64 = 0x12
+} bson_type_t;
+```
+
+**BSON 操作函数**:
+```sql
+-- 创建 BSON 文档
+SELECT bson_build_object('name', 'DocumentDB', 'version', '0.105-0');
+
+-- 解析 BSON 文档
+SELECT bson_extract_path_text('{"name": "test", "value": 123}', 'name');
+
+-- BSON 类型检查
+SELECT bson_typeof('{"field": 42}', 'field');
+
+-- BSON 数组操作
+SELECT bson_array_length('{"items": [1, 2, 3]}', 'items');
+```
+
+#### 4.1.3 错误处理机制
+
+**错误代码定义**:
+```c
+// DocumentDB 错误代码枚举
+typedef enum DocumentDBErrorCode {
+    DOCUMENTDB_ERRCODE_INTERNAL_ERROR = 1,
+    DOCUMENTDB_ERRCODE_BAD_VALUE = 2,
+    DOCUMENTDB_ERRCODE_DUPLICATE_KEY = 11000,
+    DOCUMENTDB_ERRCODE_NAMESPACE_NOT_FOUND = 26,
+    DOCUMENTDB_ERRCODE_INDEX_NOT_FOUND = 27
+} DocumentDBErrorCode;
+```
+
+**错误处理示例**:
+```sql
+-- 捕获和处理 DocumentDB 错误
+DO $$
+BEGIN
+    PERFORM documentdb_api.insert_one('testdb', 'testcol', 
+        '{"_id": "duplicate", "data": "test"}');
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'DocumentDB Error: %', SQLERRM;
+END $$;
+```
+
+### 4.2 pg_documentdb 主扩展模块
+
+#### 4.2.1 模块概述
+
+`pg_documentdb` 是 DocumentDB 的主要扩展模块，提供完整的文档数据库 API 接口。该模块实现了 MongoDB 兼容的 CRUD 操作、聚合管道、索引管理等核心功能。
+
+**主要功能**:
+- 文档 CRUD 操作
+- 聚合管道处理
+- 索引管理
+- 集合管理
+- 查询优化
+
+#### 4.2.2 文档 CRUD 操作
+
+**插入操作**:
+```sql
+-- 单文档插入
+SELECT documentdb_api.insert_one('mydb', 'users', 
+    '{"name": "张三", "age": 30, "email": "zhangsan@example.com"}');
+
+-- 批量文档插入
+SELECT documentdb_api.insert('mydb', '{
+    "insert": "users",
+    "documents": [
+        {"name": "李四", "age": 25, "department": "技术部"},
+        {"name": "王五", "age": 28, "department": "市场部"}
+    ],
+    "ordered": true
+}');
+```
+
+**查询操作**:
+```sql
+-- 基础查询
+SELECT documentdb_api.find_cursor_first_page('mydb', '{
+    "find": "users",
+    "filter": {"age": {"$gte": 25}},
+    "projection": {"name": 1, "age": 1},
+    "limit": 10
+}');
+
+-- 复杂查询条件
+SELECT documentdb_api.find_cursor_first_page('mydb', '{
+    "find": "users",
+    "filter": {
+        "$and": [
+            {"age": {"$gte": 20, "$lte": 40}},
+            {"department": {"$in": ["技术部", "产品部"]}}
+        ]
+    },
+    "sort": {"age": -1}
+}');
+```
+
+**更新操作**:
+```sql
+-- 单文档更新
+SELECT documentdb_api.update('mydb', '{
+    "update": "users",
+    "updates": [{
+        "q": {"name": "张三"},
+        "u": {"$set": {"age": 31, "lastModified": {"$currentDate": true}}},
+        "multi": false
+    }]
+}');
+
+-- 批量更新
+SELECT documentdb_api.update('mydb', '{
+    "update": "users",
+    "updates": [{
+        "q": {"department": "技术部"},
+        "u": {"$inc": {"salary": 1000}},
+        "multi": true
+    }]
+}');
+```
+
+**删除操作**:
+```sql
+-- 单文档删除
+SELECT documentdb_api.delete('mydb', '{
+    "delete": "users",
+    "deletes": [{
+        "q": {"name": "张三"},
+        "limit": 1
+    }]
+}');
+
+-- 批量删除
+SELECT documentdb_api.delete('mydb', '{
+    "delete": "users",
+    "deletes": [{
+        "q": {"age": {"$lt": 18}},
+        "limit": 0
+    }]
+}');
+```
+
+#### 4.2.3 聚合管道处理
+
+**聚合管道架构**:
+```c
+// 聚合管道构建上下文
+typedef struct AggregationPipelineBuildContext {
+    int stageNumber;
+    int nestingLevel;
+    char *databaseName;
+    char *collectionName;
+    List *pipelineStages;
+} AggregationPipelineBuildContext;
+```
+
+**聚合操作示例**:
+```sql
+-- 分组聚合
+SELECT documentdb_api.aggregate_cursor_first_page('mydb', '{
+    "aggregate": "users",
+    "pipeline": [
+        {"$match": {"age": {"$gte": 20}}},
+        {"$group": {
+            "_id": "$department",
+            "avgAge": {"$avg": "$age"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"avgAge": -1}}
+    ]
+}');
+
+-- 复杂聚合管道
+SELECT documentdb_api.aggregate_cursor_first_page('mydb', '{
+    "aggregate": "orders",
+    "pipeline": [
+        {"$match": {"status": "completed"}},
+        {"$lookup": {
+            "from": "products",
+            "localField": "productId",
+            "foreignField": "_id",
+            "as": "productInfo"
+        }},
+        {"$unwind": "$productInfo"},
+        {"$group": {
+            "_id": "$productInfo.category",
+            "totalRevenue": {"$sum": "$amount"},
+            "orderCount": {"$sum": 1}
+        }},
+        {"$project": {
+            "category": "$_id",
+            "totalRevenue": 1,
+            "orderCount": 1,
+            "avgOrderValue": {"$divide": ["$totalRevenue", "$orderCount"]}
+        }}
+    ]
+}');
+```
+
+### 4.3 pg_documentdb_gw 网关模块
+
+#### 4.3.1 模块概述
+
+`pg_documentdb_gw` 是用 Rust 编写的网关服务，负责处理 MongoDB 线协议并将请求转换为 PostgreSQL 后端调用。该模块是客户端与 DocumentDB 系统交互的主要入口点。
+
+**主要功能**:
+- MongoDB 线协议处理
+- 客户端连接管理
+- 请求路由和分发
+- 认证和授权
+- 连接池管理
+
+#### 4.3.2 请求处理流程
+
+**请求处理架构**:
+```rust
+// 请求处理函数
+pub async fn process_request(
+    request: &Request<'_>,
+    request_info: &mut RequestInfo<'_>,
+    connection_context: &mut ConnectionContext,
+    pg_data_client: impl PgDataClient,
+) -> Result<Response> {
+    // 事务处理
+    transaction::handle(request, request_info, connection_context, &pg_data_client).await?;
+    
+    // 根据请求类型分发处理
+    let response = match request.request_type() {
+        RequestType::Insert => data_management::process_insert(
+            request, request_info, connection_context, &pg_data_client
+        ).await,
+        RequestType::Find => data_management::process_find(
+            request, request_info, connection_context, &pg_data_client
+        ).await,
+        RequestType::Update => data_management::process_update(
+            request, request_info, connection_context, &pg_data_client
+        ).await,
+        RequestType::Delete => data_management::process_delete(
+            request, request_info, connection_context, &dynamic_config, &pg_data_client
+        ).await,
+        RequestType::Aggregate => data_management::process_aggregate(
+            request, request_info, connection_context, &pg_data_client
+        ).await,
+        // ... 其他请求类型处理
+    };
+    
+    response
+}
+```
+
+**连接管理**:
+```rust
+// 连接处理函数
+async fn handle_connection<T>(
+    ssl: Ssl,
+    sc: ServiceContext,
+    telemetry: Option<Box<dyn TelemetryProvider>>,
+    ip: IpAddr,
+    stream: TcpStream,
+    enforce_ssl_tcp: bool,
+    cipher_map: Option<fn(Option<&str>) -> u32>,
+) where T: PgDataClient {
+    // SSL 连接处理
+    let connection_context = ConnectionContext::new(sc, telemetry, ip);
+    
+    // 消息处理循环
+    loop {
+        match protocol::reader::read_header(&mut stream).await {
+            Ok(Some(header)) => {
+                handle_message::<R, T>(&mut connection_context, &header, &mut stream).await
+            }
+            Ok(None) => break,
+            Err(e) => {
+                log::error!("Connection error: {}", e);
+                break;
+            }
+        }
+    }
+}
+```
+
+#### 4.3.3 认证和授权
+
+**SCRAM-SHA-256 认证**:
+```rust
+// SASL 认证处理
+async fn handle_sasl_start(
+    connection_context: &mut ConnectionContext,
+    request: &Request<'_>,
+) -> Result<Response> {
+    let auth_request = request.document().get("saslStart")?;
+    let mechanism = auth_request.get("mechanism")?.as_str()?;
+    
+    match mechanism {
+        "SCRAM-SHA-256" => {
+            // 处理 SCRAM-SHA-256 认证
+            let payload = auth_request.get("payload")?.as_binary()?;
+            let client_first_message = String::from_utf8(payload.to_vec())?;
+            
+            // 生成服务器第一条消息
+            let server_first_message = generate_server_first_message(&client_first_message)?;
+            
+            Ok(Response::new(doc! {
+                "conversationId": 1,
+                "done": false,
+                "payload": server_first_message.as_bytes(),
+                "ok": 1.0
+            }))
+        }
+        _ => Err(DocumentDBError::authentication_failed("Unsupported mechanism"))
+    }
+}
+```
+
+### 4.4 用户管理系统
+
+#### 4.4.1 用户管理概述
+
+DocumentDB 提供完整的用户管理系统，支持用户的创建、删除、更新和权限管理。用户管理系统集成了 PostgreSQL 的角色系统，提供细粒度的访问控制。
+
+**主要功能**:
+- 用户创建和删除
+- 密码管理和更新
+- 角色和权限分配
+- 用户信息查询
+
+#### 4.4.2 用户操作接口
+
+**创建用户**:
+```sql
+-- 创建基础用户
+SELECT documentdb_api.create_user('mydb', '{
+    "createUser": "testuser",
+    "pwd": "securepassword123",
+    "roles": [
+        {"role": "readWrite", "db": "mydb"}
+    ]
+}');
+
+-- 创建管理员用户
+SELECT documentdb_api.create_user('admin', '{
+    "createUser": "admin",
+    "pwd": "adminpassword",
+    "roles": [
+        {"role": "userAdminAnyDatabase", "db": "admin"},
+        {"role": "dbAdminAnyDatabase", "db": "admin"}
+    ]
+}');
+```
+
+**更新用户**:
+```sql
+-- 更新用户密码
+SELECT documentdb_api.update_user('mydb', '{
+    "updateUser": "testuser",
+    "pwd": "newpassword456"
+}');
+
+-- 更新用户角色
+SELECT documentdb_api.update_user('mydb', '{
+    "updateUser": "testuser",
+    "roles": [
+        {"role": "read", "db": "mydb"},
+        {"role": "readWrite", "db": "otherdb"}
+    ]
+}');
+```
+
+**删除用户**:
+```sql
+-- 删除用户
+SELECT documentdb_api.drop_user('mydb', '{
+    "dropUser": "testuser"
+}');
+```
+
+**查询用户信息**:
+```sql
+-- 查询所有用户
+SELECT documentdb_api.users_info('admin', '{
+    "usersInfo": 1
+}');
+
+-- 查询特定用户
+SELECT documentdb_api.users_info('mydb', '{
+    "usersInfo": {"user": "testuser", "db": "mydb"}
+}');
+```
+
+#### 4.4.3 用户管理实现
+
+**用户创建处理**:
+```c
+// 用户创建核心函数
+Datum documentdb_extension_create_user(PG_FUNCTION_ARGS) {
+    text *database = PG_GETARG_TEXT_P(0);
+    pgbson *command = PG_GETARG_PGBSON(1);
+    
+    // 解析用户创建命令
+    bson_iter_t commandIter;
+    BsonValueInitIterator(command, &commandIter);
+    
+    char *username = NULL;
+    char *password = NULL;
+    List *roles = NIL;
+    
+    // 提取用户信息
+    while (bson_iter_next(&commandIter)) {
+        const char *key = bson_iter_key(&commandIter);
+        if (strcmp(key, "createUser") == 0) {
+            username = pstrdup(bson_iter_utf8(&commandIter, NULL));
+        } else if (strcmp(key, "pwd") == 0) {
+            password = pstrdup(bson_iter_utf8(&commandIter, NULL));
+        } else if (strcmp(key, "roles") == 0) {
+            roles = ParseUserRoles(&commandIter);
+        }
+    }
+    
+    // 创建 PostgreSQL 用户
+    CreatePostgresUser(username, password, roles);
+    
+    PG_RETURN_PGBSON(CreateUserResponse(username));
+}
+```
+
+### 4.5 索引管理系统
+
+#### 4.5.1 索引管理概述
+
+DocumentDB 提供强大的索引管理系统，支持多种索引类型和后台索引创建。索引系统基于 PostgreSQL 的索引机制，同时提供 MongoDB 兼容的索引接口。
+
+**支持的索引类型**:
+- 单字段索引
+- 复合索引
+- 文本索引
+- 地理空间索引
+- 向量索引 (HNSW, IVF)
+- 哈希索引
+
+#### 4.5.2 索引操作接口
+
+**创建索引**:
+```sql
+-- 创建单字段索引
+SELECT documentdb_api.create_indexes_background('mydb', '{
+    "createIndexes": "users",
+    "indexes": [{
+        "key": {"email": 1},
+        "name": "email_1",
+        "unique": true
+    }]
+}');
+
+-- 创建复合索引
+SELECT documentdb_api.create_indexes_background('mydb', '{
+    "createIndexes": "users",
+    "indexes": [{
+        "key": {"department": 1, "age": -1},
+        "name": "dept_age_idx",
+        "background": true
+    }]
+}');
+
+-- 创建文本索引
+SELECT documentdb_api.create_indexes_background('mydb', '{
+    "createIndexes": "articles",
+    "indexes": [{
+        "key": {"title": "text", "content": "text"},
+        "name": "text_search_idx",
+        "default_language": "chinese"
+    }]
+}');
+
+-- 创建向量索引
+SELECT documentdb_api.create_indexes_background('mydb', '{
+    "createIndexes": "embeddings",
+    "indexes": [{
+        "key": {"vector": "vector-hnsw"},
+        "name": "vector_hnsw_idx",
+        "vectorIndexOptions": {
+            "type": "hnsw",
+            "dimensions": 768,
+            "similarity": "cosine"
+        }
+    }]
+}');
+```
+
+**删除索引**:
+```sql
+-- 删除指定索引
+SELECT documentdb_api.drop_indexes('mydb', '{
+    "dropIndexes": "users",
+    "index": "email_1"
+}');
+
+-- 删除所有索引（除了 _id 索引）
+SELECT documentdb_api.drop_indexes('mydb', '{
+    "dropIndexes": "users",
+    "index": "*"
+}');
+```
+
+**查询索引信息**:
+```sql
+-- 列出集合的所有索引
+SELECT documentdb_api.list_indexes_cursor_first_page('mydb', '{
+    "listIndexes": "users"
+}');
+```
+
+#### 4.5.3 后台索引创建
+
+**索引队列管理**:
+```c
+// 索引请求队列结构
+typedef struct IndexCmdRequest {
+    int indexId;
+    uint64 collectionId;
+    char *createIndexCmd;
+    char cmdType;
+    IndexCmdStatus status;
+    pgbson *comment;
+    Oid userOid;
+} IndexCmdRequest;
+
+// 添加索引创建请求到队列
+void AddRequestInIndexQueue(char *createIndexCmd, int indexId, 
+                           uint64 collectionId, char cmdType, Oid userOid) {
+    StringInfo cmdStr = makeStringInfo();
+    appendStringInfo(cmdStr,
+        "INSERT INTO %s (index_id, collection_id, create_index_cmd, "
+        "cmd_type, index_cmd_status, user_oid, created_at) "
+        "VALUES ($1, $2, $3, $4, $5, $6, NOW())",
+        GetIndexQueueName());
+    
+    // 执行插入操作
+    ExecuteIndexQueueCommand(cmdStr->data, indexId, collectionId, 
+                           createIndexCmd, cmdType, userOid);
+}
+```
+
+**索引构建处理**:
+```c
+// 后台索引构建函数
+Datum command_create_indexes_background(PG_FUNCTION_ARGS) {
+    text *database = PG_GETARG_TEXT_P(0);
+    pgbson *command = PG_GETARG_PGBSON(1);
+    
+    // 解析索引创建命令
+    IndexSpec *indexSpec = ParseIndexCreationCommand(command);
+    
+    // 验证索引规范
+    ValidateIndexSpecification(indexSpec);
+    
+    // 添加到后台处理队列
+    int indexId = GenerateIndexId();
+    uint64 collectionId = GetCollectionId(database, indexSpec->collectionName);
+    
+    AddRequestInIndexQueue(BsonToJsonString(command), indexId, 
+                          collectionId, CREATE_INDEX_COMMAND_TYPE, GetUserId());
+    
+    // 返回索引创建响应
+    PG_RETURN_PGBSON(CreateIndexResponse(indexId, indexSpec->indexName));
+}
+```
+
+### 4.6 集合管理系统
+
+#### 4.6.1 集合管理概述
+
+DocumentDB 的集合管理系统负责文档集合的创建、删除、重命名和元数据管理。集合在 PostgreSQL 中以表的形式存储，同时维护相关的元数据信息。
+
+**主要功能**:
+- 集合创建和删除
+- 集合重命名
+- 集合元数据管理
+- 分片集合支持
+- 集合统计信息
+
+#### 4.6.2 集合操作接口
+
+**创建集合**:
+```sql
+-- 基础集合创建
+SELECT documentdb_api.create_collection('mydb', 'users');
+
+-- 带选项的集合创建
+SELECT documentdb_api.create_collection_with_options('mydb', '{
+    "create": "products",
+    "validator": {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["name", "price"],
+            "properties": {
+                "name": {"bsonType": "string"},
+                "price": {"bsonType": "number", "minimum": 0}
+            }
+        }
+    },
+    "validationLevel": "strict"
+}');
+```
+
+**删除集合**:
+```sql
+-- 删除集合
+SELECT documentdb_api.drop_collection('mydb', 'users');
+```
+
+**重命名集合**:
+```sql
+-- 重命名集合
+SELECT documentdb_api.rename_collection('mydb', '{
+    "renameCollection": "mydb.old_name",
+    "to": "mydb.new_name"
+}');
+```
+
+**查询集合信息**:
+```sql
+-- 列出数据库中的所有集合
+SELECT documentdb_api.list_collections_cursor_first_page('mydb', '{
+    "listCollections": 1
+}');
+
+-- 获取集合统计信息
+SELECT documentdb_api.coll_stats('mydb', '{
+    "collStats": "users",
+    "scale": 1024
+}');
+```
+
+### 4.7 查询优化系统
+
+#### 4.7.1 查询优化概述
+
+DocumentDB 集成了 PostgreSQL 的查询优化器，同时提供了专门针对文档查询的优化策略。系统能够自动选择最优的执行计划，提高查询性能。
+
+**优化策略**:
+- 索引选择优化
+- 查询重写
+- 聚合管道优化
+- 统计信息收集
+- 执行计划缓存
+
+#### 4.7.2 查询计划分析
+
+**查询解释**:
+```sql
+-- 分析查询执行计划
+SELECT documentdb_api.explain('mydb', '{
+    "explain": {
+        "find": "users",
+        "filter": {"age": {"$gte": 25}},
+        "sort": {"name": 1}
+    },
+    "verbosity": "executionStats"
+}');
+```
+
+**性能监控**:
+```sql
+-- 查看当前操作
+SELECT documentdb_api.current_op('admin', '{
+    "currentOp": 1,
+    "all": true
+}');
+
+-- 获取数据库统计信息
+SELECT documentdb_api.db_stats('mydb', '{
+    "dbStats": 1,
+    "scale": 1024
+}');
+```
+
+以上详细介绍了 DocumentDB 的各个功能模块。每个模块都提供了丰富的功能和灵活的配置选项，能够满足不同应用场景的需求。通过合理使用这些功能模块，可以构建高性能、可扩展的文档数据库应用。
 
 ---
 
 ## 5. 操作流程说明
 
-[继续包含所有操作流程说明内容...]
+DocumentDB 系统提供了完整的文档数据库操作流程，本章节详细介绍各种操作的具体流程和实现方式。
+
+### 5.1 集合创建和管理流程
+
+#### 5.1.1 集合创建流程
+
+**流程概述**：
+1. 客户端发送创建集合请求
+2. 网关验证请求格式和权限
+3. 调用 PostgreSQL 扩展函数
+4. 检查集合是否已存在
+5. 创建集合元数据
+6. 返回创建结果
+
+**详细实现**：
+```c
+// 集合创建核心函数
+Datum command_create_collection_core(PG_FUNCTION_ARGS)
+{
+    text *databaseDatum = PG_GETARG_TEXT_PP(0);
+    text *collectionDatum = PG_GETARG_TEXT_PP(1);
+    
+    // 构建创建集合查询
+    StringInfo createCollectionQuery = makeStringInfo();
+    appendStringInfo(createCollectionQuery,
+                     "SELECT %s.create_collection(%s,%s)",
+                     ApiSchemaName,
+                     quote_literal_cstr(text_to_cstring(databaseDatum)),
+                     quote_literal_cstr(text_to_cstring(collectionDatum)));
+    
+    // 执行创建操作
+    SPI_connect();
+    int ret = SPI_execute(createCollectionQuery->data, false, 0);
+    SPI_finish();
+    
+    return BoolGetDatum(ret == SPI_OK_SELECT);
+}
+```
+
+**网关处理流程**：
+```rust
+// 网关处理集合创建请求
+RequestType::Create => {
+    data_description::process_create(
+        request,
+        request_info,
+        connection_context,
+        &pg_data_client,
+    )
+    .await
+}
+```
+
+#### 5.1.2 集合删除流程
+
+**删除操作实现**：
+```c
+// 集合删除核心函数
+Datum command_drop_collection(PG_FUNCTION_ARGS)
+{
+    text *databaseName = PG_GETARG_TEXT_PP(0);
+    text *collectionName = PG_GETARG_TEXT_PP(1);
+    
+    // 构建删除集合查询
+    StringInfo dropCollectionQuery = makeStringInfo();
+    appendStringInfo(dropCollectionQuery,
+                     "SELECT %s.drop_collection(%s, %s",
+                     ApiSchemaName,
+                     quote_literal_cstr(text_to_cstring(databaseName)),
+                     quote_literal_cstr(text_to_cstring(collectionName)));
+    
+    // 执行删除操作
+    return ExecuteDropCollection(dropCollectionQuery);
+}
+```
+
+### 5.2 CRUD 操作详细流程
+
+#### 5.2.1 插入操作流程
+
+**插入操作步骤**：
+1. 解析插入规范
+2. 验证文档格式
+3. 检查集合是否存在（可选自动创建）
+4. 执行批量插入
+5. 返回插入结果
+
+**核心实现**：
+```c
+// 插入命令处理函数
+Datum command_insert(PG_FUNCTION_ARGS)
+{
+    ReportFeatureUsage(FEATURE_COMMAND_INSERT);
+    bool isTransactional = true;
+    PG_RETURN_DATUM(CommandInsertCore(fcinfo, isTransactional, CurrentMemoryContext));
+}
+
+// 插入核心逻辑
+static Datum CommandInsertCore(FunctionCallInfo fcinfo, bool isTransactional, MemoryContext memoryContext)
+{
+    // 解析插入参数
+    text *database = PG_GETARG_TEXT_P(0);
+    pgbson *insertSpec = PG_GETARG_PGBSON(1);
+    
+    // 构建批量插入规范
+    BatchInsertionSpec *batchSpec = BuildBatchInsertionSpec(&insertCommandIter, database);
+    
+    // 执行批量插入
+    BatchInsertionResult result = ProcessBatchInsertion(batchSpec, isTransactional);
+    
+    return CreateInsertionResponse(&result);
+}
+```
+
+**网关处理**：
+```rust
+// 网关处理插入请求
+RequestType::Insert => {
+    data_management::process_insert(
+        request,
+        request_info,
+        connection_context,
+        &pg_data_client,
+    )
+    .await
+}
+
+// 插入处理函数
+pub async fn process_insert(
+    request: &Request<'_>,
+    request_info: &mut RequestInfo<'_>,
+    connection_context: &ConnectionContext,
+    pg_data_client: &impl PgDataClient,
+) -> Result<Response> {
+    let response = pg_data_client
+        .query_one(
+            connection_context.service_context.query_catalog().insert(),
+            request,
+            request_info,
+        )
+        .await?;
+    Ok(Response::Pg(response))
+}
+```
+
+#### 5.2.2 查询操作流程
+
+**查询操作步骤**：
+1. 解析查询规范
+2. 生成查询计划
+3. 执行查询
+4. 创建游标（如需要）
+5. 返回第一页结果
+
+**查询实现**：
+```c
+// 查询命令处理
+Datum command_find_cursor_first_page(PG_FUNCTION_ARGS)
+{
+    text *database = PG_GETARG_TEXT_P(0);
+    pgbson *findSpec = PG_GETARG_PGBSON(1);
+    int64_t cursorId = PG_ARGISNULL(2) ? 0 : PG_GETARG_INT64(2);
+    
+    Datum response = find_cursor_first_page(database, findSpec, cursorId);
+    PG_RETURN_DATUM(response);
+}
+
+// 查询核心逻辑
+Datum find_cursor_first_page(text *database, pgbson *findSpec, int64_t cursorId)
+{
+    ReportFeatureUsage(FEATURE_COMMAND_FIND_CURSOR_FIRST_PAGE);
+    
+    // 解析查询规范生成查询数据
+    QueryData queryData = GenerateFirstPageQueryData();
+    bool generateCursorParams = true;
+    bool setStatementTimeout = true;
+    
+    // 生成查询
+    Query *query = GenerateFindQuery(database, findSpec, &queryData,
+                                     generateCursorParams,
+                                     setStatementTimeout);
+    
+    // 处理第一页请求
+    Datum response = HandleFirstPageRequest(findSpec, cursorId, &queryData,
+                                            QueryKind_Find, query);
+    return response;
+}
+```
+
+#### 5.2.3 更新操作流程
+
+**更新操作类型**：
+1. `UpdateAllMatchingDocuments` - 多文档更新
+2. `UpdateOne` - 单文档更新
+3. `UpdateOneObjectId` - 基于 ObjectId 的更新
+
+**更新实现**：
+```c
+// 更新命令处理
+Datum command_update(PG_FUNCTION_ARGS)
+{
+    ReportFeatureUsage(FEATURE_COMMAND_UPDATE);
+    
+    // 解析更新规范
+    text *database = PG_GETARG_TEXT_P(0);
+    pgbson *updateSpec = PG_GETARG_PGBSON(1);
+    
+    // 执行更新操作
+    return ProcessUpdateOperation(database, updateSpec);
+}
+```
+
+#### 5.2.4 删除操作流程
+
+**删除操作实现**：
+```c
+// 删除命令处理
+Datum command_delete(PG_FUNCTION_ARGS)
+{
+    ReportFeatureUsage(FEATURE_COMMAND_DELETE);
+    
+    // 解析删除规范
+    text *database = PG_GETARG_TEXT_P(0);
+    pgbson *deleteSpec = PG_GETARG_PGBSON(1);
+    
+    // 构建批量删除规范
+    BatchDeletionSpec *batchSpec = BuildBatchDeletionSpec(deleteSpec, database);
+    
+    // 执行批量删除
+    BatchDeletionResult result = ProcessBatchDeletion(batchSpec);
+    
+    return CreateDeletionResponse(&result);
+}
+```
+
+### 5.3 聚合管道操作流程
+
+#### 5.3.1 聚合管道处理步骤
+
+**处理流程**：
+1. 解析聚合管道规范
+2. 验证管道阶段
+3. 生成 PostgreSQL 查询
+4. 执行聚合查询
+5. 返回聚合结果
+
+**核心实现**：
+```c
+// 聚合管道处理函数
+Datum command_bson_aggregation_pipeline(PG_FUNCTION_ARGS)
+{
+    // 这是一个包装函数，在规划器中被替换
+    ereport(ERROR, (errmsg(
+        "bson_aggregation function should have been processed by the planner. This is an internal error")));
+    PG_RETURN_BOOL(false);
+}
+
+// 聚合查询生成
+Query *GenerateAggregationQuery(text *database, pgbson *aggregationSpec, QueryData *queryData)
+{
+    // 解析聚合管道
+    AggregationPipelineBuildContext context;
+    InitializeAggregationContext(&context, database);
+    
+    // 提取聚合阶段
+    List *stages = ExtractAggregationStages(aggregationSpec);
+    
+    // 逐个处理聚合阶段
+    Query *query = CreateBaseQuery();
+    ListCell *stageCell;
+    foreach(stageCell, stages)
+    {
+        pgbson *stage = (pgbson *) lfirst(stageCell);
+        query = ProcessAggregationStage(query, stage, &context);
+    }
+    
+    return query;
+}
+```
+
+**网关聚合处理**：
+```rust
+// 网关处理聚合请求
+RequestType::Aggregate => {
+    data_management::process_aggregate(
+        request,
+        request_info,
+        connection_context,
+        &pg_data_client,
+    )
+    .await
+}
+
+// 聚合处理函数
+pub async fn process_aggregate(
+    request: &Request<'_>,
+    request_info: &mut RequestInfo<'_>,
+    connection_context: &ConnectionContext,
+    pg_data_client: &impl PgDataClient,
+) -> Result<Response> {
+    let response = pg_data_client
+        .query_one(
+            connection_context.service_context.query_catalog().aggregate(),
+            request,
+            request_info,
+        )
+        .await?;
+    Ok(Response::Pg(response))
+}
+```
+
+#### 5.3.2 聚合阶段处理
+
+**常见聚合阶段**：
+- `$match` - 文档过滤
+- `$project` - 字段投影
+- `$group` - 分组聚合
+- `$sort` - 排序
+- `$limit` - 限制结果数量
+- `$lookup` - 关联查询
+
+### 5.4 网关请求处理流程
+
+#### 5.4.1 请求处理主流程
+
+**处理步骤**：
+1. 接收客户端请求
+2. 解析 MongoDB 协议
+3. 验证用户权限
+4. 路由到相应处理器
+5. 执行 PostgreSQL 查询
+6. 转换响应格式
+7. 返回结果给客户端
+
+**核心处理函数**：
+```rust
+// 主请求处理函数
+pub async fn process_request(
+    request: &Request<'_>,
+    request_info: &mut RequestInfo<'_>,
+    connection_context: &mut ConnectionContext,
+    pg_data_client: impl PgDataClient,
+) -> Result<Response> {
+    let dynamic_config = connection_context.dynamic_configuration();
+    
+    // 处理事务
+    transaction::handle(request, request_info, connection_context, &pg_data_client).await?;
+    
+    let start_time = Instant::now();
+    let mut retries = 0;
+    
+    // 请求处理循环（包含重试逻辑）
+    let result = loop {
+        let response = match request.request_type() {
+            RequestType::Aggregate => {
+                data_management::process_aggregate(request, request_info, connection_context, &pg_data_client).await
+            }
+            RequestType::Find => {
+                data_management::process_find(request, request_info, connection_context, &pg_data_client).await
+            }
+            RequestType::Insert => {
+                data_management::process_insert(request, request_info, connection_context, &pg_data_client).await
+            }
+            RequestType::Update => {
+                data_management::process_update(request, request_info, connection_context, &pg_data_client).await
+            }
+            RequestType::Delete => {
+                data_management::process_delete(request, request_info, connection_context, &dynamic_config, &pg_data_client).await
+            }
+            // ... 其他请求类型处理
+            _ => handle_other_request_types(request, request_info, connection_context, &pg_data_client).await
+        };
+        
+        // 检查是否需要重试
+        if response.is_ok() || should_stop_retrying(start_time, connection_context) {
+            return response;
+        }
+        
+        // 重试逻辑
+        let retry = determine_retry_policy(&dynamic_config, &response, request.request_type()).await;
+        handle_retry(retry, &mut retries).await;
+    };
+    
+    result
+}
+```
+
+#### 5.4.2 连接上下文管理
+
+**连接管理**：
+```rust
+// 连接上下文结构
+pub struct ConnectionContext {
+    pub start_time: Instant,
+    pub connection_id: i64,
+    pub service_context: Arc<ServiceContext>,
+    pub auth_state: AuthState,
+    pub requires_response: bool,
+    pub client_information: Option<RawDocumentBuf>,
+    pub transaction: Option<(Vec<u8>, i64)>,
+    pub telemetry_provider: Option<Box<dyn TelemetryProvider>>,
+    pub ip: SocketAddr,
+    pub cipher_type: i32,
+    pub ssl_protocol: String,
+}
+
+// 连接上下文创建
+impl ConnectionContext {
+    pub async fn new(
+        sc: ServiceContext,
+        telemetry_provider: Option<Box<dyn TelemetryProvider>>,
+        ip: SocketAddr,
+        ssl_protocol: String,
+    ) -> Self {
+        let connection_id = CONNECTION_ID.fetch_add(1, Ordering::Relaxed);
+        ConnectionContext {
+            start_time: Instant::now(),
+            connection_id,
+            service_context: Arc::new(sc),
+            auth_state: AuthState::new(),
+            requires_response: true,
+            client_information: None,
+            transaction: None,
+            telemetry_provider,
+            ip,
+            cipher_type: 0,
+            ssl_protocol,
+        }
+    }
+}
+```
+
+### 5.5 用户认证和权限管理流程
+
+#### 5.5.1 SCRAM-SHA-256 认证流程
+
+**认证步骤**：
+1. 客户端发送 SaslStart 请求
+2. 服务器生成随机数并返回
+3. 客户端发送 SaslContinue 请求
+4. 服务器验证凭据
+5. 完成认证并建立会话
+
+**认证实现**：
+```rust
+// 认证状态管理
+pub struct AuthState {
+    pub authorized: bool,
+    first_state: Option<ScramFirstState>,
+    username: Option<String>,
+    pub password: Option<String>,
+    user_oid: Option<u32>,
+}
+
+// SCRAM 第一阶段状态
+pub struct ScramFirstState {
+    nonce: String,
+    first_message_bare: String,
+    first_message: String,
+}
+
+// 处理 SaslStart 请求
+async fn handle_sasl_start(
+    connection_context: &mut ConnectionContext,
+    request: &Request<'_>,
+) -> Result<Response> {
+    let mechanism = request.document().get_str("mechanism")?;
+    
+    // 验证认证机制
+    if mechanism != "SCRAM-SHA-256" {
+        return Err(DocumentDBError::unauthorized(
+            "Only SCRAM-SHA-256 is supported".to_string(),
+        ));
+    }
+    
+    // 解析 SASL 载荷
+    let payload = parse_sasl_payload(request, true)?;
+    let username = payload.username.ok_or(DocumentDBError::unauthorized("Username missing"))?;
+    let client_nonce = payload.nonce.ok_or(DocumentDBError::unauthorized("Nonce missing"))?;
+    
+    // 生成服务器随机数
+    let mut nonce = String::with_capacity(client_nonce.len() + NONCE_LENGTH);
+    nonce.push_str(client_nonce);
+    nonce.extend(generate_server_nonce());
+    
+    // 获取用户盐值和迭代次数
+    let (salt, iterations) = get_salt_and_iteration(connection_context, username).await?;
+    let response = format!("r={},s={},i={}", nonce, salt, iterations);
+    
+    // 保存认证状态
+    connection_context.auth_state.first_state = Some(ScramFirstState {
+        nonce,
+        first_message_bare: format!("n={},r={}", username, client_nonce),
+        first_message: response.clone(),
+    });
+    
+    connection_context.auth_state.username = Some(username.to_string());
+    
+    // 返回认证响应
+    Ok(create_sasl_response(response, false))
+}
+
+// 处理 SaslContinue 请求
+async fn handle_sasl_continue(
+    connection_context: &mut ConnectionContext,
+    request: &Request<'_>,
+) -> Result<Response> {
+    let payload = parse_sasl_payload(request, false)?;
+    
+    if let Some(first_state) = connection_context.auth_state.first_state.as_ref() {
+        let client_nonce = payload.nonce.ok_or(DocumentDBError::unauthorized("Nonce missing"))?;
+        let proof = payload.proof.ok_or(DocumentDBError::unauthorized("Proof missing"))?;
+        let channel_binding = payload.channel_binding.ok_or(DocumentDBError::unauthorized("Channel binding missing"))?;
+        
+        // 验证随机数
+        if client_nonce != first_state.nonce {
+            return Err(DocumentDBError::unauthorized("Nonce mismatch"));
+        }
+        
+        // 构建认证消息
+        let auth_message = format!(
+            "{},{},c={},r={}",
+            first_state.first_message_bare,
+            first_state.first_message,
+            channel_binding,
+            client_nonce
+        );
+        
+        // 调用 PostgreSQL 认证函数
+        let scram_result = connection_context
+            .service_context
+            .authentication_connection()
+            .await?
+            .query(
+                connection_context.service_context.query_catalog().authenticate_with_scram_sha256(),
+                &[Type::TEXT, Type::TEXT, Type::TEXT],
+                &[&username, &auth_message, &proof],
+                None,
+                &mut RequestInfo::new(),
+            )
+            .await?;
+        
+        // 验证认证结果
+        let auth_doc: PgDocument = scram_result.first().ok_or(DocumentDBError::pg_response_empty())?.try_get(0)?;
+        
+        if auth_doc.0.get_i32("ok")? != 1 {
+            return Err(DocumentDBError::unauthorized("Invalid credentials"));
+        }
+        
+        let server_signature = auth_doc.0.get_str("ServerSignature")?;
+        
+        // 设置认证状态
+        connection_context.auth_state.password = Some("".to_string());
+        connection_context.auth_state.user_oid = Some(get_user_oid(connection_context, username).await?);
+        connection_context.auth_state.authorized = true;
+        
+        // 返回最终认证响应
+        Ok(create_sasl_response(format!("v={}", server_signature), true))
+    } else {
+        Err(DocumentDBError::unauthorized("SaslContinue called without SaslStart"))
+    }
+}
+```
+
+#### 5.5.2 权限验证流程
+
+**权限检查**：
+```rust
+// 权限验证
+pub async fn process<T>(
+    connection_context: &mut ConnectionContext,
+    request: &Request<'_>,
+) -> Result<Response>
+where
+    T: PgDataClient,
+{
+    // 处理认证请求
+    if let Some(response) = handle_auth_request(connection_context, request).await? {
+        return Ok(response);
+    }
+    
+    let request_info = request.extract_common();
+    
+    // 检查是否允许未认证访问
+    if request.request_type().allowed_unauthorized() {
+        let service_context = Arc::clone(&connection_context.service_context);
+        let data_client = T::new_unauthorized(&service_context).await?;
+        return processor::process_request(request, &mut request_info?, connection_context, data_client).await;
+    }
+    
+    // 要求认证
+    Err(DocumentDBError::unauthorized(format!(
+        "Command {} not supported prior to authentication.",
+        request.request_type().to_string().to_lowercase()
+    )))
+}
+```
+
+#### 5.5.3 数据池分配流程
+
+**连接池管理**：
+```rust
+// 数据池分配
+impl ConnectionContext {
+    pub async fn allocate_data_pool(&self) -> Result<()> {
+        let user = self.auth_state.username()?;
+        let pass = self.auth_state.password.as_ref()
+            .ok_or(DocumentDBError::internal_error("Password is missing"))?;
+        
+        self.service_context.allocate_data_pool(user, pass).await
+    }
+}
+```
+
+以上详细介绍了 DocumentDB 的各种操作流程。每个流程都包含了完整的实现步骤和代码示例，能够帮助开发者理解系统的工作原理和操作方式。通过遵循这些流程，可以正确地使用 DocumentDB 进行各种数据库操作。
 
 ---
 
