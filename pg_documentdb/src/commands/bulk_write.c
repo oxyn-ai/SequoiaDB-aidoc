@@ -27,6 +27,7 @@
 #include "executor/spi.h"
 #include "lib/stringinfo.h"
 #include "utils/builtins.h"
+#include "utils/resowner.h"
 
 #include "io/bson_core.h"
 #include "commands/commands_common.h"
@@ -49,23 +50,6 @@
 #include "api_hooks.h"
 #include "schema_validation/schema_validation.h"
 #include "operators/bson_expr_eval.h"
-
-/*
- * Forward declarations of structures from other command files
- */
-typedef struct
-{
-	UpdateOneParams updateOneParams;
-	int isMulti;
-} UpdateSpec;
-
-typedef struct
-{
-	uint64 rowsModified;
-	uint64 rowsMatched;
-	bool performedUpsert;
-	pgbson *upsertedObjectId;
-} UpdateResult;
 
 typedef struct
 {
@@ -330,7 +314,8 @@ ProcessBulkWrite(MongoCollection *collection, BulkWriteSpec *bulkSpec,
 }
 
 /*
- * ProcessSingleBulkOperation processes a single operation in the bulk write request.
+ * ProcessSingleBulkOperation processes a single bulk write operation with proper
+ * memory management and subtransaction handling.
  */
 static bool
 ProcessSingleBulkOperation(MongoCollection *collection,
@@ -339,7 +324,18 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 						   BulkWriteResult *bulkResult,
 						   int operationIndex)
 {
-	volatile bool isSuccess = true;
+	/*
+	 * Execute the operation inside a sub-transaction, so we can restore order
+	 * after a failure.
+	 */
+	MemoryContext oldContext = CurrentMemoryContext;
+	ResourceOwner oldOwner = CurrentResourceOwner;
+
+	/* declared volatile because of the longjmp in PG_CATCH */
+	volatile bool isSuccess = false;
+
+	/* use a subtransaction to correctly handle failures */
+	BeginInternalSubTransaction(NULL);
 
 	PG_TRY();
 	{
@@ -375,7 +371,12 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 				BsonValueInitIterator(&operation->operationSpec, &operationIter);
 				
 				UpdateOneParams updateParams = { 0 };
-				/* bool isMulti = (operation->type == BULK_WRITE_UPDATE_MANY); */
+				updateParams.returnDocument = UPDATE_RETURNS_NONE;
+				updateParams.returnFields = NULL;
+				updateParams.bypassDocumentValidation = false;
+				updateParams.isUpsert = false;
+				updateParams.sort = NULL;
+				updateParams.arrayFilters = NULL;
 				
 				while (bson_iter_next(&operationIter))
 				{
@@ -398,20 +399,28 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 					}
 				}
 				
-				UpdateOneResult updateResult = { 0 };
-				UpdateOne(collection, &updateParams, 0, transactionId, &updateResult, false, NULL);
-				
-				if (updateResult.isRowUpdated)
+				if (operation->type == BULK_WRITE_UPDATE_MANY)
 				{
-					bulkResult->matchedCount++;
-					if (!updateResult.updateSkipped)
-					{
-						bulkResult->modifiedCount++;
-					}
+					ereport(ERROR, (errcode(ERRCODE_DOCUMENTDB_COMMANDNOTSUPPORTED),
+									errmsg("updateMany operations in bulkWrite are not yet supported")));
 				}
-				if (updateResult.upsertedObjectId != NULL)
+				else
 				{
-					bulkResult->upsertedCount++;
+					UpdateOneResult updateResult = { 0 };
+					UpdateOne(collection, &updateParams, 0, transactionId, &updateResult, false, NULL);
+					
+					if (updateResult.isRowUpdated)
+					{
+						bulkResult->matchedCount++;
+						if (!updateResult.updateSkipped)
+						{
+							bulkResult->modifiedCount++;
+						}
+					}
+					if (updateResult.upsertedObjectId != NULL)
+					{
+						bulkResult->upsertedCount++;
+					}
 				}
 				break;
 			}
@@ -422,7 +431,9 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 				BsonValueInitIterator(&operation->operationSpec, &operationIter);
 				
 				DeleteOneParams deleteParams = { 0 };
-				/* int limit = (operation->type == BULK_WRITE_DELETE_ONE) ? 1 : 0; */
+				deleteParams.returnDeletedDocument = false;
+				deleteParams.returnFields = NULL;
+				deleteParams.sort = NULL;
 				
 				while (bson_iter_next(&operationIter))
 				{
@@ -433,27 +444,54 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 					}
 				}
 				
-				uint64 deletedRows = 0;
-				DeleteOneResult deleteResult = { 0 };
-				CallDeleteOne(collection, &deleteParams, 0, transactionId, false, &deleteResult);
-				if (deleteResult.isRowDeleted)
+				if (operation->type == BULK_WRITE_DELETE_MANY)
 				{
-					deletedRows = 1;
+					ereport(ERROR, (errcode(ERRCODE_DOCUMENTDB_COMMANDNOTSUPPORTED),
+									errmsg("deleteMany operations in bulkWrite are not yet supported")));
 				}
-				bulkResult->deletedCount += deletedRows;
+				else
+				{
+					DeleteOneResult deleteResult = { 0 };
+					CallDeleteOne(collection, &deleteParams, 0, transactionId, false, &deleteResult);
+					if (deleteResult.isRowDeleted)
+					{
+						bulkResult->deletedCount++;
+					}
+				}
 				break;
 			}
 			default:
 				ereport(ERROR, (errcode(ERRCODE_DOCUMENTDB_BADVALUE),
 								errmsg("Unknown bulk write operation type")));
 		}
+
+		/* Commit the inner transaction, return to outer xact context */
+		ReleaseCurrentSubTransaction();
+		MemoryContextSwitchTo(oldContext);
+		CurrentResourceOwner = oldOwner;
+		isSuccess = true;
 	}
 	PG_CATCH();
 	{
-		ErrorData *errorData = CopyErrorData();
+		MemoryContextSwitchTo(oldContext);
+		ErrorData *errorData = CopyErrorDataAndFlush();
+
+		/* Abort the inner transaction */
+		RollbackAndReleaseCurrentSubTransaction();
+		MemoryContextSwitchTo(oldContext);
+		CurrentResourceOwner = oldOwner;
+
+		/* Add error to bulk result in the correct memory context */
+		MemoryContext resultContext = bulkResult->resultMemoryContext;
+		if (resultContext != NULL)
+		{
+			MemoryContextSwitchTo(resultContext);
+		}
 		AddWriteErrorToBulkResult(bulkResult, operationIndex,
 								  errorData->sqlerrcode, errorData->message);
-		FlushErrorState();
+		MemoryContextSwitchTo(oldContext);
+		
+		FreeErrorData(errorData);
 		isSuccess = false;
 	}
 	PG_END_TRY();
