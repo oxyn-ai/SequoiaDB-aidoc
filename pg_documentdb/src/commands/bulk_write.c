@@ -489,15 +489,19 @@ CreateBulkWriteResultDocument(BulkWriteResult *bulkResult)
 		pgbson_array_writer arrayWriter;
 		PgbsonWriterStartArray(&writer, "writeErrors", 11, &arrayWriter);
 		ListCell *errorCell = NULL;
+		int errorIndex = 0;
 		foreach(errorCell, bulkResult->writeErrors)
 		{
 			WriteError *writeError = lfirst(errorCell);
 			pgbson_writer docWriter;
-			PgbsonWriterStartDocument(&writer, NULL, 0, &docWriter);
+			char indexStr[16];
+			snprintf(indexStr, sizeof(indexStr), "%d", errorIndex);
+			PgbsonWriterStartDocument(&arrayWriter, indexStr, strlen(indexStr), &docWriter);
 			PgbsonWriterAppendInt32(&docWriter, "index", 5, writeError->index);
 			PgbsonWriterAppendInt32(&docWriter, "code", 4, writeError->code);
 			PgbsonWriterAppendUtf8(&docWriter, "errmsg", 6, writeError->errmsg);
-			PgbsonWriterEndDocument(&writer, &docWriter);
+			PgbsonWriterEndDocument(&arrayWriter, &docWriter);
+			errorIndex++;
 		}
 		PgbsonWriterEndArray(&writer, &arrayWriter);
 	}
