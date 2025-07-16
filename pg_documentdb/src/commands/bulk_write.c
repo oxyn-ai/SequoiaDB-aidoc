@@ -90,15 +90,10 @@ static pgbson * CreateBulkWriteResultDocument(BulkWriteResult *bulkResult);
 static void AddWriteErrorToBulkResult(BulkWriteResult *bulkResult, int operationIndex,
 									  int errorCode, const char *errorMessage);
 
-/* External function declarations from other command files */
-extern uint64 ProcessInsertion(MongoCollection *collection, Oid optionalInsertShardOid,
-							   const bson_value_t *documentValue, text *transactionId,
-							   ExprEvalState *evalState);
-extern void ProcessUpdate(MongoCollection *collection, UpdateSpec *updateSpec,
-						  text *transactionId, UpdateResult *result, bool forceInlineWrites,
-						  ExprEvalState *stateForSchemaValidation);
-extern uint64 ProcessDeletion(MongoCollection *collection, DeletionSpec *deletionSpec,
-							  bool forceInlineWrites, text *transactionId);
+/* Include headers for command functions */
+#include "commands/insert.h"
+#include "commands/update.h"
+#include "commands/delete.h"
 
 /*
  * command_bulk_write processes a MongoDB bulkWrite command.
@@ -361,9 +356,12 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 					if (strcmp(key, "document") == 0)
 					{
 						const bson_value_t *documentValue = bson_iter_value(&operationIter);
-						uint64 insertedRows = ProcessInsertion(collection, InvalidOid, 
-															   documentValue, transactionId, NULL);
-						bulkResult->insertedCount += insertedRows;
+						pgbson *documentBson = PgbsonInitFromDocumentBsonValue(documentValue);
+						pgbson *objectId = PgbsonGetDocumentId(documentBson);
+						int64 shardKeyValue = 0;
+						InsertDocument(collection->collectionId, collection->shardTableName, 
+									   shardKeyValue, objectId, documentBson);
+						bulkResult->insertedCount++;
 						break;
 					}
 				}
@@ -377,7 +375,7 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 				BsonValueInitIterator(&operation->operationSpec, &operationIter);
 				
 				UpdateOneParams updateParams = { 0 };
-				bool isMulti = (operation->type == BULK_WRITE_UPDATE_MANY);
+				/* bool isMulti = (operation->type == BULK_WRITE_UPDATE_MANY); */
 				
 				while (bson_iter_next(&operationIter))
 				{
@@ -400,16 +398,18 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 					}
 				}
 				
-				UpdateSpec updateSpec = { 0 };
-				updateSpec.updateOneParams = updateParams;
-				updateSpec.isMulti = isMulti;
+				UpdateOneResult updateResult = { 0 };
+				UpdateOne(collection, &updateParams, 0, transactionId, &updateResult, false, NULL);
 				
-				UpdateResult updateResult = { 0 };
-				ProcessUpdate(collection, &updateSpec, transactionId, &updateResult, false, NULL);
-				
-				bulkResult->matchedCount += updateResult.rowsMatched;
-				bulkResult->modifiedCount += updateResult.rowsModified;
-				if (updateResult.performedUpsert)
+				if (updateResult.isRowUpdated)
+				{
+					bulkResult->matchedCount++;
+					if (!updateResult.updateSkipped)
+					{
+						bulkResult->modifiedCount++;
+					}
+				}
+				if (updateResult.upsertedObjectId != NULL)
 				{
 					bulkResult->upsertedCount++;
 				}
@@ -422,7 +422,7 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 				BsonValueInitIterator(&operation->operationSpec, &operationIter);
 				
 				DeleteOneParams deleteParams = { 0 };
-				int limit = (operation->type == BULK_WRITE_DELETE_ONE) ? 1 : 0;
+				/* int limit = (operation->type == BULK_WRITE_DELETE_ONE) ? 1 : 0; */
 				
 				while (bson_iter_next(&operationIter))
 				{
@@ -433,11 +433,13 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 					}
 				}
 				
-				DeletionSpec deletionSpec = { 0 };
-				deletionSpec.deleteOneParams = deleteParams;
-				deletionSpec.limit = limit;
-				
-				uint64 deletedRows = ProcessDeletion(collection, &deletionSpec, false, transactionId);
+				uint64 deletedRows = 0;
+				DeleteOneResult deleteResult = { 0 };
+				CallDeleteOne(collection, &deleteParams, 0, transactionId, false, &deleteResult);
+				if (deleteResult.isRowDeleted)
+				{
+					deletedRows = 1;
+				}
 				bulkResult->deletedCount += deletedRows;
 				break;
 			}
