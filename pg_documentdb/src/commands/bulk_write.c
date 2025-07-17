@@ -74,11 +74,6 @@ static pgbson * CreateBulkWriteResultDocument(BulkWriteResult *bulkResult);
 static void AddWriteErrorToBulkResult(BulkWriteResult *bulkResult, int operationIndex,
 									  int errorCode, const char *errorMessage);
 
-/* Include headers for command functions */
-#include "commands/insert.h"
-#include "commands/update.h"
-#include "commands/delete.h"
-
 /*
  * command_bulk_write processes a MongoDB bulkWrite command.
  */
