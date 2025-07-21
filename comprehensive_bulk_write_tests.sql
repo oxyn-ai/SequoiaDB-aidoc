@@ -246,5 +246,259 @@ ROLLBACK;
 SELECT documentdb_api.drop_collection('testdb', 'bulk_test_collection');
 
 \echo ''
-\echo '=== 测试完成 ==='
-\echo '=== Tests Completed ==='
+\echo '测试 16: 大批量操作测试 (1000个操作)'
+\echo 'Test 16: Large Batch Operations Test (1000 operations)'
+
+CREATE OR REPLACE FUNCTION test_large_bulk_operation()
+RETURNS jsonb AS $$
+DECLARE
+    ops_array jsonb := '[]'::jsonb;
+    single_op jsonb;
+    i int;
+    result jsonb;
+BEGIN
+    FOR i IN 1..1000 LOOP
+        single_op := jsonb_build_object(
+            'insertOne', jsonb_build_object(
+                'document', jsonb_build_object(
+                    '_id', i,
+                    'data', repeat('x', 100),
+                    'batch_id', 'large_test',
+                    'index', i
+                )
+            )
+        );
+        ops_array := ops_array || single_op;
+    END LOOP;
+    
+    SELECT documentdb_api.bulk_write('testdb', 
+        jsonb_build_object(
+            'bulkWrite', 'bulk_test_collection', 
+            'ops', ops_array
+        )
+    ) INTO result;
+    
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+BEGIN;
+SELECT documentdb_api.create_collection('testdb', 'bulk_test_collection');
+\timing on
+SELECT test_large_bulk_operation() AS large_batch_result;
+\timing off
+SELECT COUNT(*) as large_batch_count FROM documentdb_api.collection('testdb', 'bulk_test_collection');
+ROLLBACK;
+
+\echo ''
+\echo '测试 17: 混合大批量操作测试'
+\echo 'Test 17: Mixed Large Batch Operations Test'
+
+CREATE OR REPLACE FUNCTION test_mixed_large_bulk_operation()
+RETURNS jsonb AS $$
+DECLARE
+    ops_array jsonb := '[]'::jsonb;
+    single_op jsonb;
+    i int;
+    result jsonb;
+BEGIN
+    FOR i IN 1..300 LOOP
+        single_op := jsonb_build_object(
+            'insertOne', jsonb_build_object(
+                'document', jsonb_build_object(
+                    '_id', i,
+                    'type', 'insert',
+                    'value', i * 10
+                )
+            )
+        );
+        ops_array := ops_array || single_op;
+    END LOOP;
+    
+    FOR i IN 1..200 LOOP
+        single_op := jsonb_build_object(
+            'updateMany', jsonb_build_object(
+                'filter', jsonb_build_object('type', 'insert'),
+                'update', jsonb_build_object('$inc', jsonb_build_object('value', 1))
+            )
+        );
+        ops_array := ops_array || single_op;
+    END LOOP;
+    
+    FOR i IN 250..349 LOOP
+        single_op := jsonb_build_object(
+            'deleteOne', jsonb_build_object(
+                'filter', jsonb_build_object('_id', i)
+            )
+        );
+        ops_array := ops_array || single_op;
+    END LOOP;
+    
+    SELECT documentdb_api.bulk_write('testdb', 
+        jsonb_build_object(
+            'bulkWrite', 'bulk_test_collection', 
+            'ops', ops_array
+        )
+    ) INTO result;
+    
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+BEGIN;
+SELECT documentdb_api.create_collection('testdb', 'bulk_test_collection');
+\timing on
+SELECT test_mixed_large_bulk_operation() AS mixed_large_batch_result;
+\timing off
+SELECT COUNT(*) as mixed_batch_final_count FROM documentdb_api.collection('testdb', 'bulk_test_collection');
+ROLLBACK;
+
+\echo ''
+\echo '测试 18: 边界条件测试'
+\echo 'Test 18: Edge Cases Test'
+
+BEGIN;
+SELECT documentdb_api.create_collection('testdb', 'bulk_test_collection');
+
+SELECT documentdb_api.bulk_write('testdb', jsonb_build_object(
+    'bulkWrite', 'bulk_test_collection',
+    'ops', jsonb_build_array(
+        jsonb_build_object(
+            'insertOne', jsonb_build_object(
+                'document', jsonb_build_object(
+                    '_id', 1,
+                    'large_field', repeat('A', 10000),
+                    'metadata', jsonb_build_object(
+                        'created', now()::text,
+                        'size', 'large'
+                    )
+                )
+            )
+        )
+    )
+)) AS large_document_result;
+
+SELECT documentdb_api.bulk_write('testdb', jsonb_build_object(
+    'bulkWrite', 'bulk_test_collection',
+    'ops', jsonb_build_array(
+        jsonb_build_object(
+            'insertOne', jsonb_build_object(
+                'document', jsonb_build_object(
+                    '_id', 2,
+                    'level1', jsonb_build_object(
+                        'level2', jsonb_build_object(
+                            'level3', jsonb_build_object(
+                                'level4', jsonb_build_object(
+                                    'level5', jsonb_build_object(
+                                        'deep_value', 'nested_data'
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)) AS nested_document_result;
+
+SELECT COUNT(*) as edge_case_count FROM documentdb_api.collection('testdb', 'bulk_test_collection');
+ROLLBACK;
+
+\echo ''
+\echo '测试 19: 错误恢复和事务测试'
+\echo 'Test 19: Error Recovery and Transaction Test'
+
+BEGIN;
+SELECT documentdb_api.create_collection('testdb', 'bulk_test_collection');
+SELECT documentdb_api.insert_one('testdb', 'bulk_test_collection', '{ "_id": 1, "name": "Existing" }');
+
+SELECT documentdb_api.bulk_write('testdb', jsonb_build_object(
+    'bulkWrite', 'bulk_test_collection',
+    'ordered', true,
+    'ops', jsonb_build_array(
+        jsonb_build_object('insertOne', jsonb_build_object('document', jsonb_build_object('_id', 2, 'name', 'Valid1'))),
+        jsonb_build_object('insertOne', jsonb_build_object('document', jsonb_build_object('_id', 3, 'name', 'Valid2'))),
+        jsonb_build_object('insertOne', jsonb_build_object('document', jsonb_build_object('_id', 1, 'name', 'Duplicate'))),
+        jsonb_build_object('insertOne', jsonb_build_object('document', jsonb_build_object('_id', 4, 'name', 'ShouldNotInsert')))
+    )
+)) AS ordered_error_recovery_result;
+
+SELECT COUNT(*) as count_after_ordered_error FROM documentdb_api.collection('testdb', 'bulk_test_collection');
+
+SELECT documentdb_api.bulk_write('testdb', jsonb_build_object(
+    'bulkWrite', 'bulk_test_collection',
+    'ordered', false,
+    'ops', jsonb_build_array(
+        jsonb_build_object('insertOne', jsonb_build_object('document', jsonb_build_object('_id', 5, 'name', 'Valid3'))),
+        jsonb_build_object('insertOne', jsonb_build_object('document', jsonb_build_object('_id', 1, 'name', 'Duplicate2'))),
+        jsonb_build_object('insertOne', jsonb_build_object('document', jsonb_build_object('_id', 6, 'name', 'Valid4')))
+    )
+)) AS unordered_error_recovery_result;
+
+SELECT COUNT(*) as count_after_unordered_error FROM documentdb_api.collection('testdb', 'bulk_test_collection');
+ROLLBACK;
+
+\echo ''
+\echo '测试 20: 复杂updateMany和deleteMany测试'
+\echo 'Test 20: Complex updateMany and deleteMany Test'
+
+BEGIN;
+SELECT documentdb_api.create_collection('testdb', 'bulk_test_collection');
+
+SELECT documentdb_api.insert('testdb', jsonb_build_object(
+    'insert', 'bulk_test_collection',
+    'documents', jsonb_build_array(
+        jsonb_build_object('_id', 1, 'category', 'A', 'status', 'active', 'score', 10),
+        jsonb_build_object('_id', 2, 'category', 'A', 'status', 'active', 'score', 20),
+        jsonb_build_object('_id', 3, 'category', 'A', 'status', 'inactive', 'score', 15),
+        jsonb_build_object('_id', 4, 'category', 'B', 'status', 'active', 'score', 25),
+        jsonb_build_object('_id', 5, 'category', 'B', 'status', 'active', 'score', 30),
+        jsonb_build_object('_id', 6, 'category', 'B', 'status', 'inactive', 'score', 5),
+        jsonb_build_object('_id', 7, 'category', 'C', 'status', 'pending', 'score', 12)
+    )
+));
+
+SELECT documentdb_api.bulk_write('testdb', jsonb_build_object(
+    'bulkWrite', 'bulk_test_collection',
+    'ops', jsonb_build_array(
+        jsonb_build_object(
+            'updateMany', jsonb_build_object(
+                'filter', jsonb_build_object('category', 'A'),
+                'update', jsonb_build_object(
+                    '$inc', jsonb_build_object('score', 5),
+                    '$set', jsonb_build_object('updated', true)
+                )
+            )
+        ),
+        jsonb_build_object(
+            'updateMany', jsonb_build_object(
+                'filter', jsonb_build_object('status', 'active'),
+                'update', jsonb_build_object('$set', jsonb_build_object('last_active', 'today'))
+            )
+        ),
+        jsonb_build_object(
+            'deleteMany', jsonb_build_object(
+                'filter', jsonb_build_object('status', 'inactive')
+            )
+        ),
+        jsonb_build_object(
+            'deleteMany', jsonb_build_object(
+                'filter', jsonb_build_object('score', jsonb_build_object('$lt', 15))
+            )
+        )
+    )
+)) AS complex_operations_result;
+
+SELECT COUNT(*) as final_document_count FROM documentdb_api.collection('testdb', 'bulk_test_collection');
+SELECT document FROM documentdb_api.collection('testdb', 'bulk_test_collection') ORDER BY (document->>'_id')::int;
+ROLLBACK;
+
+DROP FUNCTION IF EXISTS test_large_bulk_operation();
+DROP FUNCTION IF EXISTS test_mixed_large_bulk_operation();
+
+SELECT documentdb_api.drop_collection('testdb', 'bulk_test_collection');
+
+\echo ''
+\echo '=== 增强测试完成 ==='
+\echo '=== Enhanced Tests Completed ==='
