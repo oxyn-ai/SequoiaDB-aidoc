@@ -350,6 +350,12 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 						pgbson *documentBson = PgbsonInitFromDocumentBsonValue(documentValue);
 						pgbson *objectId = PgbsonGetDocumentId(documentBson);
 						int64 shardKeyValue = 0;
+						if (collection->shardKey != NULL)
+						{
+							shardKeyValue = ComputeShardKeyHashForDocument(collection->shardKey, 
+																		   collection->collectionId, 
+																		   documentBson);
+						}
 						InsertDocument(collection->collectionId, collection->shardTableName, 
 									   shardKeyValue, objectId, documentBson);
 						bulkResult->insertedCount++;
@@ -396,8 +402,34 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 				
 				if (operation->type == BULK_WRITE_UPDATE_MANY)
 				{
-					ereport(ERROR, (errcode(ERRCODE_DOCUMENTDB_COMMANDNOTSUPPORTED),
-									errmsg("updateMany operations in bulkWrite are not yet supported")));
+					/* For updateMany, we need to implement it by finding and updating all matching documents */
+					/* This is a simplified implementation - in production, this should be optimized */
+					int matchedCount = 0;
+					int modifiedCount = 0;
+					
+					/* For now, we'll use a loop approach similar to how MongoDB handles updateMany */
+					/* This could be optimized later with batch operations */
+					UpdateOneResult updateResult = { 0 };
+					do {
+						updateResult = (UpdateOneResult){ 0 };
+						UpdateOne(collection, &updateParams, 0, transactionId, &updateResult, false, NULL);
+						
+						if (updateResult.isRowUpdated)
+						{
+							matchedCount++;
+							if (!updateResult.updateSkipped)
+							{
+								modifiedCount++;
+							}
+						}
+					} while (updateResult.isRowUpdated && !updateParams.isUpsert);
+					
+					bulkResult->matchedCount += matchedCount;
+					bulkResult->modifiedCount += modifiedCount;
+					if (updateResult.upsertedObjectId != NULL)
+					{
+						bulkResult->upsertedCount++;
+					}
 				}
 				else
 				{
@@ -441,8 +473,23 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 				
 				if (operation->type == BULK_WRITE_DELETE_MANY)
 				{
-					ereport(ERROR, (errcode(ERRCODE_DOCUMENTDB_COMMANDNOTSUPPORTED),
-									errmsg("deleteMany operations in bulkWrite are not yet supported")));
+					/* Use DeleteAllMatchingDocuments for deleteMany operations */
+					pgbson *queryDoc = PgbsonInitFromDocumentBsonValue(operation->filter);
+					bool hasShardKeyValueFilter = false;
+					int64 shardKeyHash = 0;
+					
+					/* Check if we have shard key filter for sharded collections */
+					if (collection->shardKey != NULL)
+					{
+						ComputeShardKeyHashForQuery(collection->shardKey, collection->collectionId, 
+													queryDoc, &shardKeyHash, &hasShardKeyValueFilter);
+					}
+					
+					uint64 deletedCount = DeleteAllMatchingDocuments(collection, queryDoc,
+																	 deleteParams.variableSpec,
+																	 hasShardKeyValueFilter, 
+																	 shardKeyHash);
+					bulkResult->deletedCount += deletedCount;
 				}
 				else
 				{
