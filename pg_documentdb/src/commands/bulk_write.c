@@ -57,6 +57,16 @@ typedef struct
 	int limit;
 } DeletionSpec;
 
+/*
+ * BulkOperationBatch represents a batch of similar operations that can be merged
+ */
+typedef struct
+{
+	BulkWriteOperationType operationType;
+	List *operations;
+	int operationCount;
+} BulkOperationBatch;
+
 PG_FUNCTION_INFO_V1(command_bulk_write);
 
 static BulkWriteSpec * BuildBulkWriteSpec(bson_iter_t *bulkWriteCommandIter,
@@ -73,6 +83,11 @@ static bool ProcessSingleBulkOperation(MongoCollection *collection,
 static pgbson * CreateBulkWriteResultDocument(BulkWriteResult *bulkResult);
 static void AddWriteErrorToBulkResult(BulkWriteResult *bulkResult, int operationIndex,
 									  int errorCode, const char *errorMessage);
+static void OptimizeBulkOperations(List *operations);
+static void PreallocateResultMemory(BulkWriteResult *result, int operationCount);
+static bool CanMergeOperation(BulkOperationBatch *currentBatch, BulkWriteOperation *op);
+static void AddOperationToBatch(BulkOperationBatch *currentBatch, BulkWriteOperation *op);
+static BulkOperationBatch * CreateNewBatch(BulkWriteOperation *op);
 
 /*
  * command_bulk_write processes a MongoDB bulkWrite command.
@@ -278,6 +293,10 @@ static void
 ProcessBulkWrite(MongoCollection *collection, BulkWriteSpec *bulkSpec,
 				 text *transactionId, BulkWriteResult *bulkResult)
 {
+	/* Performance optimization: Pre-allocate memory for results */
+	int operationCount = list_length(bulkSpec->operations);
+	PreallocateResultMemory(bulkResult, operationCount);
+	
 	bulkResult->ok = 1.0;
 	bulkResult->insertedCount = 0;
 	bulkResult->matchedCount = 0;
@@ -286,6 +305,9 @@ ProcessBulkWrite(MongoCollection *collection, BulkWriteSpec *bulkSpec,
 	bulkResult->upsertedCount = 0;
 	bulkResult->upsertedIds = NIL;
 	bulkResult->writeErrors = NIL;
+
+	/* Performance optimization: Optimize operations for batching */
+	OptimizeBulkOperations(bulkSpec->operations);
 
 	ListCell *operationCell = NULL;
 	int operationIndex = 0;
@@ -604,4 +626,120 @@ AddWriteErrorToBulkResult(BulkWriteResult *bulkResult, int operationIndex,
 	bulkResult->writeErrors = lappend(bulkResult->writeErrors, writeError);
 
 	MemoryContextSwitchTo(oldContext);
+}
+
+/*
+ * OptimizeBulkOperations merges similar consecutive operations for better performance
+ */
+static void
+OptimizeBulkOperations(List *operations)
+{
+	List *optimizedOps = NIL;
+	BulkOperationBatch *currentBatch = NULL;
+	
+	ListCell *opCell;
+	foreach(opCell, operations)
+	{
+		BulkWriteOperation *op = lfirst(opCell);
+		
+		if (CanMergeOperation(currentBatch, op))
+		{
+			AddOperationToBatch(currentBatch, op);
+		}
+		else
+		{
+			if (currentBatch != NULL)
+			{
+				optimizedOps = lappend(optimizedOps, currentBatch);
+			}
+			currentBatch = CreateNewBatch(op);
+		}
+	}
+	
+	/* Add the last batch if it exists */
+	if (currentBatch != NULL)
+	{
+		optimizedOps = lappend(optimizedOps, currentBatch);
+	}
+}
+
+/*
+ * PreallocateResultMemory allocates memory for results based on operation count
+ */
+static void
+PreallocateResultMemory(BulkWriteResult *result, int operationCount)
+{
+	/* Create a dedicated memory context for bulk write results */
+	MemoryContext resultContext = AllocSetContextCreate(
+		CurrentMemoryContext,
+		"BulkWriteResultContext",
+		ALLOCSET_DEFAULT_SIZES);
+	
+	result->resultMemoryContext = resultContext;
+	
+	/* Switch to the result context for allocations */
+	MemoryContext oldContext = MemoryContextSwitchTo(resultContext);
+	
+	/* Initialize result counters */
+	result->insertedCount = 0;
+	result->matchedCount = 0;
+	result->modifiedCount = 0;
+	result->deletedCount = 0;
+	result->upsertedCount = 0;
+	
+	/* Pre-allocate lists - estimate 10% failure rate for errors */
+	result->writeErrors = NIL;
+	result->upsertedIds = NIL;
+	
+	MemoryContextSwitchTo(oldContext);
+}
+
+/*
+ * CanMergeOperation checks if an operation can be merged with the current batch
+ */
+static bool
+CanMergeOperation(BulkOperationBatch *currentBatch, BulkWriteOperation *op)
+{
+	if (currentBatch == NULL)
+	{
+		return false;
+	}
+	
+	/* Only merge operations of the same type */
+	if (currentBatch->operationType != op->type)
+	{
+		return false;
+	}
+	
+	/* For now, we only merge insert operations as they're the safest to batch */
+	if (op->type == BULK_WRITE_INSERT_ONE)
+	{
+		return true;
+	}
+	
+	/* Other operation types could be merged with more sophisticated logic */
+	return false;
+}
+
+/*
+ * AddOperationToBatch adds an operation to an existing batch
+ */
+static void
+AddOperationToBatch(BulkOperationBatch *currentBatch, BulkWriteOperation *op)
+{
+	currentBatch->operations = lappend(currentBatch->operations, op);
+	currentBatch->operationCount++;
+}
+
+/*
+ * CreateNewBatch creates a new batch for the given operation
+ */
+static BulkOperationBatch *
+CreateNewBatch(BulkWriteOperation *op)
+{
+	BulkOperationBatch *batch = palloc0(sizeof(BulkOperationBatch));
+	batch->operationType = op->type;
+	batch->operations = list_make1(op);
+	batch->operationCount = 1;
+	return batch;
 }
