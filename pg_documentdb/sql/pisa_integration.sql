@@ -70,6 +70,194 @@ CREATE OR REPLACE FUNCTION documentdb_api.analyze_query_routing(
 LANGUAGE C STRICT
 AS 'MODULE_PATHNAME', 'documentdb_analyze_query_routing';
 
+CREATE OR REPLACE FUNCTION documentdb_api.execute_advanced_pisa_query(
+    database_name text,
+    collection_name text,
+    query_terms jsonb,
+    algorithm int DEFAULT 5,
+    top_k int DEFAULT 10
+) RETURNS TABLE(
+    document_id text,
+    score numeric,
+    document jsonb,
+    collection_id bigint
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_execute_advanced_pisa_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.execute_pisa_wand_query(
+    database_name text,
+    collection_name text,
+    query_terms jsonb,
+    top_k int DEFAULT 10
+) RETURNS TABLE(
+    document_id text,
+    score numeric,
+    document jsonb
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_execute_pisa_wand_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.execute_pisa_block_max_wand_query(
+    database_name text,
+    collection_name text,
+    query_terms jsonb,
+    top_k int DEFAULT 10
+) RETURNS TABLE(
+    document_id text,
+    score numeric,
+    document jsonb
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_execute_pisa_block_max_wand_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.execute_pisa_maxscore_query(
+    database_name text,
+    collection_name text,
+    query_terms jsonb,
+    top_k int DEFAULT 10
+) RETURNS TABLE(
+    document_id text,
+    score numeric,
+    document jsonb
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_execute_pisa_maxscore_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.analyze_pisa_query_plan(
+    query_terms jsonb,
+    top_k int DEFAULT 10
+) RETURNS TABLE(
+    selected_algorithm text,
+    essential_terms jsonb,
+    non_essential_terms jsonb,
+    estimated_cost numeric,
+    estimated_results int,
+    use_block_max_optimization boolean,
+    use_early_termination boolean
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_analyze_pisa_query_plan';
+
+CREATE OR REPLACE FUNCTION documentdb_api.schedule_document_reordering(
+    database_name text,
+    collection_name text,
+    priority int DEFAULT 1
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_schedule_document_reordering';
+
+CREATE OR REPLACE FUNCTION documentdb_api.cancel_document_reordering(
+    database_name text,
+    collection_name text
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_cancel_document_reordering';
+
+CREATE OR REPLACE FUNCTION documentdb_api.execute_recursive_graph_bisection(
+    database_name text,
+    collection_name text,
+    depth int DEFAULT 8,
+    cache_depth int DEFAULT 2
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_execute_recursive_graph_bisection';
+
+CREATE OR REPLACE FUNCTION documentdb_api.get_reordering_stats(
+    database_name text,
+    collection_name text
+) RETURNS TABLE(
+    total_documents bigint,
+    reordered_documents bigint,
+    compression_ratio_before numeric,
+    compression_ratio_after numeric,
+    improvement_percentage numeric,
+    last_reordering_time timestamptz,
+    reordering_iterations int
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_get_reordering_stats';
+
+CREATE OR REPLACE FUNCTION documentdb_api.get_all_reordering_tasks()
+RETURNS TABLE(
+    database_name text,
+    collection_name text,
+    scheduled_time timestamptz,
+    started_time timestamptz,
+    completed_time timestamptz,
+    priority int,
+    is_running boolean,
+    is_completed boolean,
+    compression_improvement numeric,
+    documents_processed bigint
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_get_all_reordering_tasks';
+
+CREATE OR REPLACE FUNCTION documentdb_api.create_pisa_text_index(
+    database_name text,
+    collection_name text,
+    index_options jsonb DEFAULT '{}',
+    compression_type int DEFAULT 1
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_create_pisa_text_index';
+
+CREATE OR REPLACE FUNCTION documentdb_api.execute_pisa_text_query(
+    database_name text,
+    collection_name text,
+    query_text text,
+    limit_count int DEFAULT 10
+) RETURNS TABLE(
+    document_id text,
+    score numeric,
+    document jsonb,
+    collection_id bigint
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_execute_pisa_text_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.execute_hybrid_pisa_query(
+    database_name text,
+    collection_name text,
+    text_query text DEFAULT NULL,
+    filter_criteria jsonb DEFAULT '{}',
+    sort_criteria jsonb DEFAULT '{}',
+    limit_count int DEFAULT 10,
+    offset_count int DEFAULT 0
+) RETURNS TABLE(
+    document_id text,
+    score numeric,
+    document jsonb,
+    collection_id bigint
+)
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_execute_hybrid_pisa_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.optimize_pisa_text_index(
+    database_name text,
+    collection_name text
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_optimize_pisa_text_index';
+
+CREATE OR REPLACE FUNCTION documentdb_api.export_collection_to_pisa_format(
+    database_name text,
+    collection_name text,
+    output_path text
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_export_collection_to_pisa_format';
+
+CREATE OR REPLACE FUNCTION documentdb_api.build_complete_pisa_index(
+    database_name text,
+    collection_name text,
+    index_path text,
+    compression_type int DEFAULT 1
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_build_complete_pisa_index';
+
 CREATE OR REPLACE VIEW documentdb_api.pisa_configuration AS
 SELECT 
     name,
@@ -103,3 +291,23 @@ GRANT EXECUTE ON FUNCTION documentdb_api.find_with_pisa_search(text, jsonb) TO d
 GRANT SELECT ON documentdb_api.pisa_index_status TO documentdb_readonly_role;
 GRANT EXECUTE ON FUNCTION documentdb_api.analyze_query_routing(jsonb) TO documentdb_readonly_role;
 GRANT SELECT ON documentdb_api.pisa_configuration TO documentdb_readonly_role;
+
+GRANT EXECUTE ON FUNCTION documentdb_api.execute_advanced_pisa_query(text, text, jsonb, int, int) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.execute_pisa_wand_query(text, text, jsonb, int) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.execute_pisa_block_max_wand_query(text, text, jsonb, int) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.execute_pisa_maxscore_query(text, text, jsonb, int) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.analyze_pisa_query_plan(jsonb, int) TO documentdb_readonly_role;
+
+GRANT EXECUTE ON FUNCTION documentdb_api.schedule_document_reordering(text, text, int) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.cancel_document_reordering(text, text) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.execute_recursive_graph_bisection(text, text, int, int) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.get_reordering_stats(text, text) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.get_all_reordering_tasks() TO documentdb_readonly_role;
+
+GRANT EXECUTE ON FUNCTION documentdb_api.create_pisa_text_index(text, text, jsonb, int) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.execute_pisa_text_query(text, text, text, int) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.execute_hybrid_pisa_query(text, text, text, jsonb, jsonb, int, int) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.optimize_pisa_text_index(text, text) TO documentdb_admin_role;
+
+GRANT EXECUTE ON FUNCTION documentdb_api.export_collection_to_pisa_format(text, text, text) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.build_complete_pisa_index(text, text, text, int) TO documentdb_admin_role;
