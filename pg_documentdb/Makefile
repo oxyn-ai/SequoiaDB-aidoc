@@ -44,7 +44,9 @@ PISA_INTEGRATION_SOURCES = \
 	src/pisa_integration/data_bridge.c \
 	src/pisa_integration/index_sync.c \
 	src/pisa_integration/query_router.c \
-	src/pisa_integration/documentdb_pisa_export.c
+	src/pisa_integration/documentdb_pisa_export.c \
+	src/pisa_integration/advanced_query_algorithms.c \
+	src/pisa_integration/document_reordering.c
 
 SOURCES += $(PISA_INTEGRATION_SOURCES)
 

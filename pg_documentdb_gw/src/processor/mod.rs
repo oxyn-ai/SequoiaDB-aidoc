@@ -12,6 +12,7 @@ mod data_description;
 mod data_management;
 mod indexing;
 mod ismaster;
+mod pisa_query_processor;
 mod process;
 mod session;
 mod transaction;
