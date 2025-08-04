@@ -4,7 +4,8 @@ PISA_INTEGRATION_SOURCES = \
 	pisa_integration.c \
 	data_bridge.c \
 	index_sync.c \
-	query_router.c
+	query_router.c \
+	documentdb_pisa_export.c
 
 PISA_INTEGRATION_HEADERS = \
 	$(top_srcdir)/include/pisa_integration/pisa_integration.h \
