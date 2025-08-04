@@ -311,3 +311,120 @@ GRANT EXECUTE ON FUNCTION documentdb_api.optimize_pisa_text_index(text, text) TO
 
 GRANT EXECUTE ON FUNCTION documentdb_api.export_collection_to_pisa_format(text, text, text) TO documentdb_admin_role;
 GRANT EXECUTE ON FUNCTION documentdb_api.build_complete_pisa_index(text, text, text, int) TO documentdb_admin_role;
+
+CREATE OR REPLACE FUNCTION documentdb_api.create_shard_mapping(
+    database_name text,
+    collection_name text,
+    shard_count int,
+    shard_strategy text DEFAULT 'hash'
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_create_shard_mapping';
+
+CREATE OR REPLACE FUNCTION documentdb_api.drop_shard_mapping(
+    database_name text,
+    collection_name text
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_drop_shard_mapping';
+
+CREATE OR REPLACE FUNCTION documentdb_api.get_shard_for_document(
+    database_name text,
+    collection_name text,
+    document_id text
+) RETURNS int
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_get_shard_for_document';
+
+CREATE OR REPLACE FUNCTION documentdb_api.coordinate_sharded_query(
+    database_name text,
+    collection_name text,
+    query jsonb
+) RETURNS jsonb
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_coordinate_sharded_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.balance_shards(
+    database_name text,
+    collection_name text
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_balance_shards';
+
+CREATE OR REPLACE FUNCTION documentdb_api.get_shard_statistics(
+    database_name text,
+    collection_name text
+) RETURNS jsonb
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_get_shard_statistics';
+
+CREATE OR REPLACE FUNCTION documentdb_api.cache_pisa_query(
+    cache_key text,
+    result jsonb,
+    ttl_seconds int DEFAULT 300
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_cache_pisa_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.get_cached_pisa_query(
+    cache_key text
+) RETURNS jsonb
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_get_cached_pisa_query';
+
+CREATE OR REPLACE FUNCTION documentdb_api.invalidate_pisa_cache(
+    pattern text
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_invalidate_pisa_cache';
+
+CREATE OR REPLACE FUNCTION documentdb_api.get_pisa_cache_stats()
+RETURNS jsonb
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_get_pisa_cache_stats';
+
+CREATE OR REPLACE FUNCTION documentdb_api.reset_pisa_cache()
+RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_reset_pisa_cache';
+
+CREATE OR REPLACE FUNCTION documentdb_api.record_pisa_metric(
+    metric_type int,
+    value float8,
+    context text DEFAULT ''
+) RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_record_pisa_metric';
+
+CREATE OR REPLACE FUNCTION documentdb_api.get_pisa_metrics()
+RETURNS jsonb
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_get_pisa_metrics';
+
+CREATE OR REPLACE FUNCTION documentdb_api.get_pisa_performance_stats()
+RETURNS jsonb
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_get_pisa_performance_stats';
+
+CREATE OR REPLACE FUNCTION documentdb_api.optimize_pisa_performance()
+RETURNS boolean
+LANGUAGE C STRICT
+AS 'MODULE_PATHNAME', 'documentdb_optimize_pisa_performance';
+
+GRANT EXECUTE ON FUNCTION documentdb_api.create_shard_mapping(text, text, int, text) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.drop_shard_mapping(text, text) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.get_shard_for_document(text, text, text) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.coordinate_sharded_query(text, text, jsonb) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.balance_shards(text, text) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.get_shard_statistics(text, text) TO documentdb_readonly_role;
+
+GRANT EXECUTE ON FUNCTION documentdb_api.cache_pisa_query(text, jsonb, int) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.get_cached_pisa_query(text) TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.invalidate_pisa_cache(text) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.get_pisa_cache_stats() TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.reset_pisa_cache() TO documentdb_admin_role;
+
+GRANT EXECUTE ON FUNCTION documentdb_api.record_pisa_metric(int, float8, text) TO documentdb_admin_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.get_pisa_metrics() TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.get_pisa_performance_stats() TO documentdb_readonly_role;
+GRANT EXECUTE ON FUNCTION documentdb_api.optimize_pisa_performance() TO documentdb_admin_role;

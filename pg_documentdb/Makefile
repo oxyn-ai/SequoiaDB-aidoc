@@ -46,7 +46,10 @@ PISA_INTEGRATION_SOURCES = \
 	src/pisa_integration/query_router.c \
 	src/pisa_integration/documentdb_pisa_export.c \
 	src/pisa_integration/advanced_query_algorithms.c \
-	src/pisa_integration/document_reordering.c
+	src/pisa_integration/document_reordering.c \
+	src/pisa_integration/sharding_support.c \
+	src/pisa_integration/query_cache.c \
+	src/pisa_integration/performance_monitor.c
 
 SOURCES += $(PISA_INTEGRATION_SOURCES)
 
