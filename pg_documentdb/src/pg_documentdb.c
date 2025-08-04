@@ -14,6 +14,7 @@
 #include "bson_init.h"
 #include "utils/feature_counter.h"
 #include "documentdb_api_init.h"
+#include "pisa_integration/pisa_integration.h"
 
 PG_MODULE_MAGIC;
 
@@ -50,6 +51,9 @@ _PG_init(void)
 	MarkGUCPrefixReserved("documentdb");
 	InitializeDocumentDBBackgroundWorker("pg_documentdb", "documentdb", "documentdb");
 
+	RegisterPisaConfigurationParameters();
+	InitializePisaIntegration();
+
 	InstallDocumentDBApiPostgresHooks();
 
 	ereport(LOG, (errmsg("Initialized pg_documentdb extension")));
@@ -68,4 +72,5 @@ _PG_fini(void)
 	}
 
 	UninstallDocumentDBApiPostgresHooks();
+	ShutdownPisaIntegration();
 }
