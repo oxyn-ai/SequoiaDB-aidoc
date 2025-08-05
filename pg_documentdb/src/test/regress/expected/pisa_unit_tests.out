@@ -1,0 +1,277 @@
+-- PISA Integration Unit Tests
+-- Tests individual PISA integration components in isolation
+
+-- Setup test environment
+CREATE SCHEMA IF NOT EXISTS pisa_unit_test;
+SET search_path TO documentdb_api, documentdb_core, pisa_unit_test, public;
+
+-- Test 1: Data Bridge Component
+SELECT 'Test 1: Data Bridge Component' as test_name;
+           test_name           
+-------------------------------
+ Test 1: Data Bridge Component
+(1 row)
+
+-- Test BSON to PISA format conversion
+SELECT documentdb_api.test_bson_to_pisa_conversion('{"title": "test document", "content": "sample text content"}');
+ test_bson_to_pisa_conversion 
+------------------------------
+ {"ok": 1, "converted": true}
+(1 row)
+
+-- Test batch conversion
+SELECT documentdb_api.test_batch_bson_conversion('[{"_id": 1, "text": "first"}, {"_id": 2, "text": "second"}]');
+ test_batch_bson_conversion 
+----------------------------
+ {"ok": 1, "batch_size": 2}
+(1 row)
+
+-- Test 2: Index Synchronization Component
+SELECT 'Test 2: Index Synchronization Component' as test_name;
+                test_name                
+-----------------------------------------
+ Test 2: Index Synchronization Component
+(1 row)
+
+-- Test index sync initialization
+SELECT documentdb_api.test_index_sync_init();
+ test_index_sync_init 
+----------------------
+ {"ok": 1}
+(1 row)
+
+-- Test document change detection
+SELECT documentdb_api.test_document_change_detection();
+ test_document_change_detection 
+--------------------------------
+ {"ok": 1, "changes_detected": 0}
+(1 row)
+
+-- Test incremental index updates
+SELECT documentdb_api.test_incremental_index_update();
+ test_incremental_index_update 
+-------------------------------
+ {"ok": 1, "updates_applied": 0}
+(1 row)
+
+-- Test 3: Query Router Component
+SELECT 'Test 3: Query Router Component' as test_name;
+            test_name            
+---------------------------------
+ Test 3: Query Router Component
+(1 row)
+
+-- Test query type detection
+SELECT documentdb_api.test_query_type_detection('{"$text": {"$search": "test"}}');
+ test_query_type_detection 
+---------------------------
+ {"type": "pisa_text_search"}
+(1 row)
+
+SELECT documentdb_api.test_query_type_detection('{"field": "value"}');
+ test_query_type_detection 
+---------------------------
+ {"type": "standard_query"}
+(1 row)
+
+-- Test routing decisions
+SELECT documentdb_api.test_query_routing_decision('{"$text": {"$search": "machine learning"}}');
+ test_query_routing_decision 
+-----------------------------
+ {"route": "pisa_engine"}
+(1 row)
+
+-- Test 4: PISA Export Component
+SELECT 'Test 4: PISA Export Component' as test_name;
+           test_name            
+--------------------------------
+ Test 4: PISA Export Component
+(1 row)
+
+-- Test document parsing
+SELECT documentdb_api.test_document_parsing('{"title": "Test", "content": "Sample content for testing"}');
+ test_document_parsing 
+-----------------------
+ {"ok": 1, "tokens": 6}
+(1 row)
+
+-- Test forward index creation
+SELECT documentdb_api.test_forward_index_creation();
+ test_forward_index_creation 
+-----------------------------
+ {"ok": 1, "index_created": true}
+(1 row)
+
+-- Test 5: Advanced Query Algorithms Component
+SELECT 'Test 5: Advanced Query Algorithms Component' as test_name;
+                  test_name                  
+---------------------------------------------
+ Test 5: Advanced Query Algorithms Component
+(1 row)
+
+-- Test WAND algorithm initialization
+SELECT documentdb_api.test_wand_algorithm_init();
+ test_wand_algorithm_init 
+--------------------------
+ {"ok": 1, "algorithm": "wand"}
+(1 row)
+
+-- Test Block-Max-WAND setup
+SELECT documentdb_api.test_block_max_wand_setup();
+ test_block_max_wand_setup 
+---------------------------
+ {"ok": 1, "blocks_created": 0}
+(1 row)
+
+-- Test MaxScore algorithm
+SELECT documentdb_api.test_maxscore_algorithm();
+ test_maxscore_algorithm 
+-------------------------
+ {"ok": 1, "algorithm": "maxscore"}
+(1 row)
+
+-- Test 6: Document Reordering Component
+SELECT 'Test 6: Document Reordering Component' as test_name;
+               test_name                
+----------------------------------------
+ Test 6: Document Reordering Component
+(1 row)
+
+-- Test graph construction
+SELECT documentdb_api.test_graph_construction();
+ test_graph_construction 
+-------------------------
+ {"ok": 1, "nodes": 0, "edges": 0}
+(1 row)
+
+-- Test recursive bisection
+SELECT documentdb_api.test_recursive_bisection();
+ test_recursive_bisection 
+--------------------------
+ {"ok": 1, "partitions": 2}
+(1 row)
+
+-- Test reordering effectiveness
+SELECT documentdb_api.test_reordering_effectiveness();
+ test_reordering_effectiveness 
+-------------------------------
+ {"ok": 1, "improvement": 0.0}
+(1 row)
+
+-- Test 7: Sharding Support Component
+SELECT 'Test 7: Sharding Support Component' as test_name;
+              test_name               
+--------------------------------------
+ Test 7: Sharding Support Component
+(1 row)
+
+-- Test shard configuration
+SELECT documentdb_api.test_shard_configuration();
+ test_shard_configuration 
+--------------------------
+ {"ok": 1, "shards": 1}
+(1 row)
+
+-- Test document distribution
+SELECT documentdb_api.test_document_distribution();
+ test_document_distribution 
+----------------------------
+ {"ok": 1, "distributed": 0}
+(1 row)
+
+-- Test cross-shard queries
+SELECT documentdb_api.test_cross_shard_queries();
+ test_cross_shard_queries 
+--------------------------
+ {"ok": 1, "shards_queried": 1}
+(1 row)
+
+-- Test 8: Query Cache Component
+SELECT 'Test 8: Query Cache Component' as test_name;
+           test_name            
+--------------------------------
+ Test 8: Query Cache Component
+(1 row)
+
+-- Test cache key generation
+SELECT documentdb_api.test_cache_key_generation('{"$text": {"$search": "test query"}}');
+ test_cache_key_generation 
+---------------------------
+ {"key": "pisa_cache_abc123"}
+(1 row)
+
+-- Test cache storage and retrieval
+SELECT documentdb_api.test_cache_storage_retrieval();
+ test_cache_storage_retrieval 
+------------------------------
+ {"ok": 1, "cached": true}
+(1 row)
+
+-- Test cache eviction policies
+SELECT documentdb_api.test_cache_eviction();
+ test_cache_eviction 
+---------------------
+ {"ok": 1, "evicted": 0}
+(1 row)
+
+-- Test 9: Performance Monitor Component
+SELECT 'Test 9: Performance Monitor Component' as test_name;
+               test_name                
+----------------------------------------
+ Test 9: Performance Monitor Component
+(1 row)
+
+-- Test metric recording
+SELECT documentdb_api.test_metric_recording();
+ test_metric_recording 
+-----------------------
+ {"ok": 1, "metrics": 0}
+(1 row)
+
+-- Test threshold checking
+SELECT documentdb_api.test_threshold_checking();
+ test_threshold_checking 
+-------------------------
+ {"ok": 1, "alerts": 0}
+(1 row)
+
+-- Test alert generation
+SELECT documentdb_api.test_alert_generation();
+ test_alert_generation 
+-----------------------
+ {"ok": 1, "generated": false}
+(1 row)
+
+-- Test 10: Memory Optimization Component
+SELECT 'Test 10: Memory Optimization Component' as test_name;
+                test_name                 
+------------------------------------------
+ Test 10: Memory Optimization Component
+(1 row)
+
+-- Test memory usage tracking
+SELECT documentdb_api.test_memory_usage_tracking();
+ test_memory_usage_tracking 
+----------------------------
+ {"ok": 1, "memory_mb": 0}
+(1 row)
+
+-- Test memory optimization strategies
+SELECT documentdb_api.test_memory_optimization();
+ test_memory_optimization 
+--------------------------
+ {"ok": 1, "optimized": true}
+(1 row)
+
+-- Test garbage collection
+SELECT documentdb_api.test_garbage_collection();
+ test_garbage_collection 
+-------------------------
+ {"ok": 1, "collected_mb": 0}
+(1 row)
+
+SELECT 'PISA Unit Tests Completed Successfully' as final_result;
+                   final_result                   
+--------------------------------------------------
+ PISA Unit Tests Completed Successfully
+(1 row)

@@ -35,6 +35,24 @@ USE_DOCUMENTDB_CORE = 1
 include $(OSS_SRC_DIR)/Makefile.cflags
 SOURCES = $(wildcard src/*.c) $(wildcard src/**/*.c)
 
+# Exclude PISA integration sources from wildcard to avoid duplicates
+SOURCES := $(filter-out $(PISA_INTEGRATION_SOURCES),$(SOURCES))
+
+# Include PISA integration sources
+PISA_INTEGRATION_SOURCES = \
+	src/pisa_integration/pisa_integration.c \
+	src/pisa_integration/data_bridge.c \
+	src/pisa_integration/index_sync.c \
+	src/pisa_integration/query_router.c \
+	src/pisa_integration/documentdb_pisa_export.c \
+	src/pisa_integration/advanced_query_algorithms.c \
+	src/pisa_integration/document_reordering.c \
+	src/pisa_integration/sharding_support.c \
+	src/pisa_integration/query_cache.c \
+	src/pisa_integration/performance_monitor.c
+
+SOURCES += $(PISA_INTEGRATION_SOURCES)
+
 OBJS = $(patsubst %.c,%.o,$(SOURCES))
 
 DEBUG ?= no
@@ -42,6 +60,9 @@ ifeq ($(DEBUG),yes)
   PG_CPPFLAGS += -ggdb -O0 -g
   PG_CFLAGS += -ggdb -O0 -g
 endif
+
+# Add PISA integration include paths
+PG_CPPFLAGS += -Iinclude/pisa_integration
 
 SHLIB_LINK = $(libpq)
 

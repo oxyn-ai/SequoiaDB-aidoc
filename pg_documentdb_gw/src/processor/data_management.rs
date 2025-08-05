@@ -16,7 +16,7 @@ use crate::{
     context::ConnectionContext,
     error::{DocumentDBError, ErrorCode, Result},
     postgres::PgDataClient,
-    processor::cursor,
+    processor::{cursor, pisa_query_processor},
     requests::{Request, RequestInfo},
     responses::{PgResponse, Response},
 };
@@ -49,6 +49,15 @@ pub async fn process_find(
     connection_context: &ConnectionContext,
     pg_data_client: &impl PgDataClient,
 ) -> Result<Response> {
+    if pisa_query_processor::should_use_pisa_for_query(request, request_info)? {
+        return pisa_query_processor::execute_pisa_enhanced_find(
+            request,
+            request_info,
+            connection_context,
+            pg_data_client,
+        ).await;
+    }
+
     let (response, conn) = pg_data_client
         .execute_find(request, request_info, connection_context)
         .await?;
@@ -78,6 +87,15 @@ pub async fn process_aggregate(
     connection_context: &ConnectionContext,
     pg_data_client: &impl PgDataClient,
 ) -> Result<Response> {
+    if pisa_query_processor::should_use_pisa_for_query(request, request_info)? {
+        return pisa_query_processor::process_pisa_enhanced_aggregate(
+            request,
+            request_info,
+            connection_context,
+            pg_data_client,
+        ).await;
+    }
+
     let (response, conn) = pg_data_client
         .execute_aggregate(request, request_info, connection_context)
         .await?;
