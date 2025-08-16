@@ -1,4 +1,4 @@
-# SequoiaDB-aidoc: High-Performance Document Database
+# SequoiaDB-aidoc: High-Performance Document Database for PostgreSQL
 
 ## Introduction
 
@@ -30,26 +30,31 @@ graph TD
     end
 
     subgraph "Gateway Layer (Rust)"
-        E["Protocol Gateway<br/>pg_documentdb_gw"]
-        F["PISA Query Router<br/>pisa_query_proc"]
-        G["Load Balancer<br/>load_balancer"]
+        E["Protocol Gateway\\npg_documentdb_gw"]
+        F["PISA Query Router\\npisa_query_proc"]
+        G["Load Balancer\\nload_balancer"]
     end
 
     subgraph "PostgreSQL Extension Layer (C)"
-        H["DocumentDB Core<br/>pg_documentdb"]
-        I["PISA Integration Module<br/>pisa_integration"]
-        J["Distributed Extension<br/>distributed"]
+        H["DocumentDB Core\\npg_documentdb"]
+        I["PISA Integration Module\\npisa_integration"]
+        J["Distributed Extension\\ndistributed"]
     end
 
     subgraph "PostgreSQL Database Engine"
-        K["BSON Storage Engine<br/>bson_storage"]
-        L["PISA Index Engine<br/>pisa_indexes"]
-        M["Vector Index Engine<br/>vector_index"]
+        K["BSON Storage Engine\\nbson_storage"]
+        L["PISA Index Engine\\npisa_indexes"]
+        M["Vector Index Engine\\nvector_index"]
     end
 
-    "Client Application Layer" --> "Gateway Layer (Rust)"
-    "Gateway Layer (Rust)" --> "PostgreSQL Extension Layer (C)"
-    "PostgreSQL Extension Layer (C)" --> "PostgreSQL Database Engine"
+    A --> E
+    B --> E
+    C --> H
+    D --> E
+    E --> H
+    H --> K
+    H --> L
+    H --> M
 ```
 
 ## Core Features
