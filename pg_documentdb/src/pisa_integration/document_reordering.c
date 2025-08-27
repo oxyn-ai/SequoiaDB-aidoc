@@ -4,7 +4,6 @@
 
 bool ExecuteRecursiveGraphBisection(const char *database_name, const char *collection_name, int depth, int cache_depth) { return false; }
 #else
-#else
 
 
 #include "postgres.h"

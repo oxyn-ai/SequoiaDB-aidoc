@@ -55,7 +55,7 @@ PISA_INTEGRATION_SOURCES = \
 	src/pisa_integration/query_cache.c \
 	src/pisa_integration/performance_monitor.c
 
-ifdef DISABLE_PISA
+ifneq (,$(findstring -DDISABLE_PISA,$(PG_CPPFLAGS)))
 # PISA integration disabled; do not compile its sources
 # (headers provide stubs so other code can include them safely)
 else

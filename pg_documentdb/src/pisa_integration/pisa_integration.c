@@ -19,7 +19,6 @@ char *ConvertBsonToPisaFormat(const pgbson *document) { return NULL; }
 pgbson *ConvertPisaResultToBson(const char *pisa_result) { return NULL; }
 void RegisterPisaConfigurationParameters(void) {}
 #else
-#else
 
 
 #include "postgres.h"

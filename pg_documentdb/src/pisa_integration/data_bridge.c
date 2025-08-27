@@ -6,7 +6,6 @@
 
 List *ExportCollectionToPisa(const char *database_name, const char *collection_name, int mode) { return NIL; }
 #else
-#else
 
 
 #include "postgres.h"
