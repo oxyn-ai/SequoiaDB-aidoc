@@ -495,27 +495,22 @@ ProcessSingleBulkOperation(MongoCollection *collection,
 				
 				if (operation->type == BULK_WRITE_DELETE_MANY)
 				{
-					/* Use DeleteAllMatchingDocuments for deleteMany operations */
-					pgbson *queryDoc = PgbsonInitFromDocumentBsonValue(operation->filter);
-					bool hasShardKeyValueFilter = false;
-					int64 shardKeyHash = 0;
-					
-					/* Check if we have shard key filter for sharded collections */
-					if (collection->shardKey != NULL)
+					uint64 deletedCount = 0;
+					for (;;)
 					{
-						ComputeShardKeyHashForQuery(collection->shardKey, collection->collectionId, 
-													queryDoc, &shardKeyHash, &hasShardKeyValueFilter);
+						DeleteOneResult deleteResult = (DeleteOneResult){ 0 };
+						CallDeleteOne(collection, &deleteParams, 0, transactionId, false, &deleteResult);
+						if (!deleteResult.isRowDeleted)
+						{
+							break;
+						}
+						deletedCount++;
 					}
-					
-					uint64 deletedCount = DeleteAllMatchingDocuments(collection, queryDoc,
-																	 deleteParams.variableSpec,
-																	 hasShardKeyValueFilter, 
-																	 shardKeyHash);
 					bulkResult->deletedCount += deletedCount;
 				}
 				else
 				{
-					DeleteOneResult deleteResult = { 0 };
+					DeleteOneResult deleteResult = (DeleteOneResult){ 0 };
 					CallDeleteOne(collection, &deleteParams, 0, transactionId, false, &deleteResult);
 					if (deleteResult.isRowDeleted)
 					{
