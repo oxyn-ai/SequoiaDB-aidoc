@@ -39,7 +39,6 @@ ExecutePisaTextQuery(const char *database_name, const char *collection_name,
 {
     PisaQueryContext *context;
     List *results = NIL;
-    List *pisa_results;
     ListCell *cell;
 
     if (!pisa_integration_enabled)
@@ -52,11 +51,13 @@ ExecutePisaTextQuery(const char *database_name, const char *collection_name,
     context->limit = limit;
     context->use_pisa = true;
 
+    List *tmp_pisa = NIL;
+
     PG_TRY();
     {
-        pisa_results = ExecutePisaTextSearch(context);
+        tmp_pisa = ExecutePisaTextSearch(context);
         
-        foreach(cell, pisa_results)
+        foreach(cell, tmp_pisa)
         {
             PisaTextSearchResult *pisa_result = (PisaTextSearchResult *) lfirst(cell);
             results = lappend(results, pisa_result);
@@ -85,37 +86,45 @@ ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
     if (!pisa_integration_enabled || context == NULL)
         return NIL;
 
+    List *tmp_pisa = NIL;
+    List *tmp_docdb = NIL;
+    List *tmp_combined = NIL;
+
     PG_TRY();
     {
         if (context->use_pisa_text && context->text_query != NULL)
         {
-            pisa_results = ExecutePisaTextQuery(context->database_name, 
-                                              context->collection_name,
-                                              context->text_query, 
-                                              context->limit * 2);
+            tmp_pisa = ExecutePisaTextQuery(context->database_name,
+                                            context->collection_name,
+                                            context->text_query,
+                                            context->limit * 2);
         }
 
         if (context->use_documentdb_vector || context->filter_criteria != NULL)
         {
-            documentdb_results = NIL;
+            tmp_docdb = NIL;
         }
 
-        combined_results = CombinePisaAndDocumentDBResults(pisa_results, 
-                                                          documentdb_results,
-                                                          context->sort_criteria, 
-                                                          context->limit);
+        tmp_combined = CombinePisaAndDocumentDBResults(tmp_pisa,
+                                                       tmp_docdb,
+                                                       context->sort_criteria,
+                                                       context->limit);
 
-        elog(DEBUG1, "Hybrid query returned %d results (PISA: %d, DocumentDB: %d)", 
-             list_length(combined_results), 
-             list_length(pisa_results), 
-             list_length(documentdb_results));
+        elog(DEBUG1, "Hybrid query returned %d results (PISA: %d, DocumentDB: %d)",
+             list_length(tmp_combined),
+             list_length(tmp_pisa),
+             list_length(tmp_docdb));
     }
     PG_CATCH();
     {
         elog(WARNING, "Hybrid PISA query failed");
-        combined_results = NIL;
+        tmp_combined = NIL;
     }
     PG_END_TRY();
+
+    pisa_results = tmp_pisa;
+    documentdb_results = tmp_docdb;
+    combined_results = tmp_combined;
 
     return combined_results;
 }
