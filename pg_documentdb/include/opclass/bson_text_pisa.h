@@ -39,6 +39,8 @@ typedef struct PisaTextSearchResult
 
 typedef struct PisaHybridQueryContext
 {
+    char *database_name;
+    char *collection_name;
     char *text_query;
     pgbson *filter_criteria;
     bool use_pisa_text;

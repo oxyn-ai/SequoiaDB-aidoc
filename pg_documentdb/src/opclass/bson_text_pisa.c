@@ -189,8 +189,7 @@ OptimizePisaTextIndex(const char *database_name, const char *collection_name)
 
     elog(LOG, "Optimizing PISA text index for %s.%s", database_name, collection_name);
 
-    return BuildCompletePisaIndex(database_name, collection_name, 
-                                 pisa_index_base_path, pisa_default_compression);
+    return CreatePisaIndex(database_name, collection_name, pisa_default_compression);
 }
 
 double
