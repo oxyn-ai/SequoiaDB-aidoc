@@ -79,16 +79,12 @@ ExecutePisaTextQuery(const char *database_name, const char *collection_name,
 List *
 ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
 {
-    List *pisa_results = NIL;
-    List *documentdb_results = NIL;
-    List *combined_results = NIL;
-
     if (!pisa_integration_enabled || context == NULL)
         return NIL;
 
-    List *tmp_pisa = NIL;
-    List *tmp_docdb = NIL;
-    List *tmp_combined = NIL;
+    volatile List *tmp_pisa = NIL;
+    volatile List *tmp_docdb = NIL;
+    volatile List *tmp_combined = NIL;
 
     PG_TRY();
     {
@@ -105,15 +101,15 @@ ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
             tmp_docdb = NIL;
         }
 
-        tmp_combined = CombinePisaAndDocumentDBResults(tmp_pisa,
-                                                       tmp_docdb,
+        tmp_combined = CombinePisaAndDocumentDBResults((List *) tmp_pisa,
+                                                       (List *) tmp_docdb,
                                                        context->sort_criteria,
                                                        context->limit);
 
         elog(DEBUG1, "Hybrid query returned %d results (PISA: %d, DocumentDB: %d)",
-             list_length(tmp_combined),
-             list_length(tmp_pisa),
-             list_length(tmp_docdb));
+             list_length((List *) tmp_combined),
+             list_length((List *) tmp_pisa),
+             list_length((List *) tmp_docdb));
     }
     PG_CATCH();
     {
@@ -122,11 +118,7 @@ ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
     }
     PG_END_TRY();
 
-    pisa_results = tmp_pisa;
-    documentdb_results = tmp_docdb;
-    combined_results = tmp_combined;
-
-    return combined_results;
+    return (List *) tmp_combined;
 }
 
 bool
