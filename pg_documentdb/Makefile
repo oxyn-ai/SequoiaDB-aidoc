@@ -55,7 +55,14 @@ PISA_INTEGRATION_SOURCES = \
 	src/pisa_integration/query_cache.c \
 	src/pisa_integration/performance_monitor.c
 
+ifdef DISABLE_PISA
+# PISA integration disabled; do not compile its sources
+# (headers provide stubs so other code can include them safely)
+else
 SOURCES += $(PISA_INTEGRATION_SOURCES)
+# Add PISA integration include paths when enabled
+PG_CPPFLAGS += -Iinclude/pisa_integration
+endif
 
 OBJS = $(patsubst %.c,%.o,$(SOURCES))
 
@@ -64,10 +71,6 @@ ifeq ($(DEBUG),yes)
   PG_CPPFLAGS += -ggdb -O0 -g
   PG_CFLAGS += -ggdb -O0 -g
 endif
-
-# Add PISA integration include paths
-PG_CPPFLAGS += -Iinclude/pisa_integration
-
 SHLIB_LINK = $(libpq)
 
 include $(OSS_SRC_DIR)/Makefile.global
