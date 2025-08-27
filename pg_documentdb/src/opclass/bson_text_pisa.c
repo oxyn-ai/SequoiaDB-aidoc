@@ -51,11 +51,9 @@ ExecutePisaTextQuery(const char *database_name, const char *collection_name,
     context->limit = limit;
     context->use_pisa = true;
 
-    List *tmp_pisa = NIL;
-
     PG_TRY();
     {
-        tmp_pisa = ExecutePisaTextSearch(context);
+        List *tmp_pisa = ExecutePisaTextSearch(context);
         
         foreach(cell, tmp_pisa)
         {
