@@ -1,0 +1,7 @@
+-- basic load test
+CREATE EXTENSION pg_documentdb_docsql;
+SELECT documentdb_docsql.version();
+              version              
+-----------------------------------
+ 1.0
+(1 row)

@@ -13,8 +13,9 @@ on:
   push:
     branches:
       - 'main'
-    paths-ignore:
-      - '*.md'
+    paths:
+      - 'pg_documentdb_gw/**'
+      - '.github/containers/Build-Ubuntu/Dockerfile_gateway'
 
 permissions:
   packages: write

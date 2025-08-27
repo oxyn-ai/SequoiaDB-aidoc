@@ -187,6 +187,14 @@ sudo make install
 ./scripts/start_oss_server.sh
 ```
 
+### Pure SQL Interface (docsql)
+
+- Install extension:
+  CREATE EXTENSION pg_documentdb_docsql;
+
+- Check version:
+  SELECT documentdb_docsql.version();
+
 ### Connecting to the Server
 
 Connect to the PostgreSQL shell to start using `SequoiaDB-aidoc`.
