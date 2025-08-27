@@ -3,7 +3,7 @@ MODULE_big = pg_documentdb_docsql
 OBJS = src/docsql.o
 
 DATA = sql/pg_documentdb_docsql--1.0.sql
-REGRESS = docsql_basic docsql_crud
+REGRESS = docsql_basic docsql_crud docsql_update_delete
 
 PGFILEDESC = "pg_documentdb_docsql - Pure SQL interface for DocumentDB"
 
