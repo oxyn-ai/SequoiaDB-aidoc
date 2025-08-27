@@ -1,0 +1,24 @@
+CREATE EXTENSION IF NOT EXISTS pg_documentdb;
+CREATE EXTENSION IF NOT EXISTS pg_documentdb_docsql;
+SELECT documentdb_docsql.create_database('docdb1');
+ create_database 
+-----------------
+ 
+(1 row)
+
+SELECT documentdb_docsql.create_collection('docdb1','patient');
+ create_collection 
+-------------------
+ 
+(1 row)
+
+INSERT INTO docsql_docdb1.patient(document)
+VALUES ('{ "patient_id": "P001", "name": "Alice", "age": 30 }');
+INSERT 0 1
+SELECT (document ->> 'patient_id') AS pid, (document ->> 'name') AS name
+FROM docsql_docdb1.patient
+ORDER BY pid;
+ pid | name  
+-----+-------
+ P001| Alice
+(1 row)
