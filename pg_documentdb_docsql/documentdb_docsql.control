@@ -1,0 +1,6 @@
+comment = 'Pure SQL interface for DocumentDB on PostgreSQL'
+default_version = '0.1-0'
+module_pathname = '$libdir/pg_documentdb_docsql'
+relocatable = false
+superuser = true
+# requires = 'documentdb_core, documentdb'  # Temporarily disabled for testing

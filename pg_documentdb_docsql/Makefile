@@ -27,7 +27,7 @@ POSTGIS_SCHEMA_NAME=public
 EXTENSION_OBJECT_PREFIX=documentdb_docsql
 API_GUC_PREFIX=documentdb_docsql
 
-USE_DOCUMENTDB_CORE = 1
+# USE_DOCUMENTDB_CORE = 1  # Temporarily disable core dependency for testing
 include $(OSS_SRC_DIR)/Makefile.cflags
 SOURCES = $(wildcard src/*.c) $(wildcard src/**/*.c)
 

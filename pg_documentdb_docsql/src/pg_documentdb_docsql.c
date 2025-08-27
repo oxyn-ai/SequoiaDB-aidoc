@@ -10,6 +10,7 @@
 #include <fmgr.h>
 #include <miscadmin.h>
 #include <utils/guc.h>
+#include <utils/guc_tables.h>
 
 PG_MODULE_MAGIC;
 
@@ -38,7 +39,7 @@ _PG_init(void)
 							"variable in postgresql.conf. ")));
 	}
 
-	MarkGUCPrefixReserved("documentdb_docsql");
+	/* MarkGUCPrefixReserved("documentdb_docsql"); // Function not available in this PostgreSQL version */
 
 	ereport(LOG, (errmsg("Initialized pg_documentdb_docsql extension")));
 }
