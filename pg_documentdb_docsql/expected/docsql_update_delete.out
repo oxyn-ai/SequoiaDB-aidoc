@@ -27,6 +27,6 @@ SELECT (document->>'_id') id, (document->>'total') total
 FROM docsql_docdb2.orders
 ORDER BY id;
  id | total 
-----+-------
+----+------
  o1 | 15
 (1 row)

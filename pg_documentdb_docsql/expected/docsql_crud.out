@@ -18,7 +18,7 @@ INSERT 0 1
 SELECT (document ->> 'patient_id') AS pid, (document ->> 'name') AS name
 FROM docsql_docdb1.patient
 ORDER BY pid;
- pid | name  
------+-------
- P001| Alice
+ pid | name 
+-----+------
+ P001 | Alice
 (1 row)
