@@ -1,3 +1,9 @@
+#ifdef DISABLE_PISA
+static inline bool ExecuteRecursiveGraphBisection(const char *database_name, const char *collection_name, int depth, int cache_depth) { return false; }
+#endif
+#else
+
+
 /*-------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation.  All rights reserved.
  *
@@ -15,7 +21,7 @@
 #include "storage/lwlock.h"
 #include "postmaster/bgworker.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "pisa_integration/pisa_integration.h"
 
 typedef struct DocumentReorderingTask
@@ -83,4 +89,5 @@ void FreeDocumentReorderingStats(DocumentReorderingStats *stats);
 
 extern ReorderingScheduler *reordering_scheduler;
 
+#endif
 #endif

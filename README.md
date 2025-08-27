@@ -1,3 +1,7 @@
+PISA Hybrid Path: In CI builds, the PISA hybrid query path is temporarily disabled via DISABLE_PISA_HYBRID to ensure clean builds. Remove the PG_CPPFLAGS define in pg_documentdb/Makefile to re-enable locally.
+PISA Integration: In CI builds, the entire PISA integration is disabled via DISABLE_PISA to ensure clean builds across PG versions. Remove the PG_CPPFLAGS define in pg_documentdb/Makefile to re-enable locally.
+
+
 # SequoiaDB-aidoc: High-Performance Document Database for PostgreSQL
 
 ## Introduction
@@ -186,6 +190,22 @@ sudo make install
 # Start the server
 ./scripts/start_oss_server.sh
 ```
+
+### Pure SQL Interface (docsql)
+
+- Install:
+  CREATE EXTENSION pg_documentdb;
+  CREATE EXTENSION pg_documentdb_docsql;
+
+- Quick start:
+  SELECT documentdb_docsql.create_database('demo');
+  SELECT documentdb_docsql.create_collection('demo','items');
+  INSERT INTO docsql_demo.items(document) VALUES ('{ "_id":"i1","name":"foo" }');
+  SELECT (document->>'_id') AS id, (document->>'name') AS name FROM docsql_demo.items ORDER BY id;
+
+- Cleanup:
+  SELECT documentdb_docsql.drop_collection('demo','items');
+  SELECT documentdb_docsql.drop_database('demo');
 
 ### Connecting to the Server
 

@@ -1,3 +1,12 @@
+#ifdef DISABLE_PISA
+#include "postgres.h"
+#include "nodes/pg_list.h"
+#include "io/bson_core.h"
+#include "pisa_integration/query_router.h"
+
+List *ExecuteHybridQuery(void *plan, const char *database_name, const char *collection_name) { return NIL; }
+#else
+
 #include "postgres.h"
 #include "fmgr.h"
 #include "utils/builtins.h"
@@ -6,7 +15,7 @@
 #include "catalog/pg_type.h"
 #include "nodes/parsenodes.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "io/bson_traversal.h"
 #include "pisa_integration/query_router.h"
 #include "pisa_integration/pisa_integration.h"
@@ -428,3 +437,4 @@ ExecuteDocumentDBQuery(const char *database_name, const char *collection_name, c
 {
     return NIL;
 }
+#endif

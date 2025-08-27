@@ -1,3 +1,13 @@
+#ifdef DISABLE_PISA
+#include "postgres.h"
+#include "nodes/pg_list.h"
+#include "io/bson_core.h"
+#include "pisa_integration/pisa_integration.h"
+
+bool CreatePisaIndex(const char *database_name, const char *collection_name, int compression_type) { return false; }
+#else
+
+
 #include "postgres.h"
 #include "fmgr.h"
 #include "utils/memutils.h"
@@ -7,7 +17,7 @@
 #include "access/htup_details.h"
 #include "executor/spi.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "io/bson_traversal.h"
 #include "pisa_integration/data_bridge.h"
 #include "pisa_integration/pisa_integration.h"
@@ -401,3 +411,4 @@ documentdb_build_complete_pisa_index(PG_FUNCTION_ARGS)
     
     PG_RETURN_BOOL(result);
 }
+#endif

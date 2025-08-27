@@ -15,7 +15,7 @@
 #include "nodes/primnodes.h"
 #include "tsearch/ts_type.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "opclass/bson_text_gin.h"
 #include "pisa_integration/pisa_integration.h"
 
@@ -39,6 +39,8 @@ typedef struct PisaTextSearchResult
 
 typedef struct PisaHybridQueryContext
 {
+    char *database_name;
+    char *collection_name;
     char *text_query;
     pgbson *filter_criteria;
     bool use_pisa_text;

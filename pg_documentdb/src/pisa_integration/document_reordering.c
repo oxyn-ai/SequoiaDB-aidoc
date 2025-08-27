@@ -1,3 +1,11 @@
+#ifdef DISABLE_PISA
+#include "postgres.h"
+#include "pisa_integration/document_reordering.h"
+
+bool ExecuteRecursiveGraphBisection(const char *database_name, const char *collection_name, int depth, int cache_depth) { return false; }
+#else
+
+
 #include "postgres.h"
 #include "fmgr.h"
 #include "utils/memutils.h"
@@ -7,7 +15,7 @@
 #include "postmaster/bgworker.h"
 #include "miscadmin.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "pisa_integration/document_reordering.h"
 #include "pisa_integration/pisa_integration.h"
 #include "pisa_integration/data_bridge.h"
@@ -432,3 +440,4 @@ FreeDocumentReorderingStats(DocumentReorderingStats *stats)
     
     pfree(stats);
 }
+#endif

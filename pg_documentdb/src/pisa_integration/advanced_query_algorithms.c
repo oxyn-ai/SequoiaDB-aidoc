@@ -1,3 +1,26 @@
+#ifdef DISABLE_PISA
+#include "postgres.h"
+#include "nodes/pg_list.h"
+#include "io/bson_core.h"
+#include "pisa_integration/advanced_query_algorithms.h"
+
+List *ExecutePisaWandQuery(PisaQueryContext *context)
+{
+    return NIL;
+}
+
+List *ExecutePisaBM25Query(PisaQueryContext *context)
+{
+    return NIL;
+}
+
+List *ExecutePisaHybridWandQuery(PisaQueryContext *context)
+{
+    return NIL;
+}
+
+#else
+
 #include "postgres.h"
 #include "fmgr.h"
 #include "utils/memutils.h"
@@ -5,7 +28,7 @@
 #include "utils/array.h"
 #include "catalog/pg_type.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "pisa_integration/advanced_query_algorithms.h"
 #include "pisa_integration/pisa_integration.h"
 #include "pisa_integration/data_bridge.h"
@@ -566,3 +589,4 @@ FreePisaQueryExecutionPlan(PisaQueryExecutionPlan *plan)
 
     pfree(plan);
 }
+#endif

@@ -1,0 +1,5 @@
+# pg_documentdb_docsql control file
+comment = 'Pure SQL interface for DocumentDB (docsql)'
+default_version = '1.0'
+relocatable = false
+requires = 'pg_documentdb,pg_documentdb_core'

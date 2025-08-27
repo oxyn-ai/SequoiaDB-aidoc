@@ -1,3 +1,9 @@
+PG_CPPFLAGS += -DDISABLE_PISA
+PG_CFLAGS += -DDISABLE_PISA
+
+PG_CPPFLAGS += -DDISABLE_PISA_HYBRID
+PG_CFLAGS += -DDISABLE_PISA_HYBRID
+
 EXTENSION = documentdb
 MODULE_big = pg_$(EXTENSION)
 
@@ -51,7 +57,12 @@ PISA_INTEGRATION_SOURCES = \
 	src/pisa_integration/query_cache.c \
 	src/pisa_integration/performance_monitor.c
 
+ifneq (,$(findstring -DDISABLE_PISA,$(PG_CPPFLAGS) $(PG_CFLAGS)))
+# PISA integration disabled; do not compile its sources
+else
 SOURCES += $(PISA_INTEGRATION_SOURCES)
+PG_CPPFLAGS += -Iinclude/pisa_integration
+endif
 
 OBJS = $(patsubst %.c,%.o,$(SOURCES))
 
@@ -60,10 +71,6 @@ ifeq ($(DEBUG),yes)
   PG_CPPFLAGS += -ggdb -O0 -g
   PG_CFLAGS += -ggdb -O0 -g
 endif
-
-# Add PISA integration include paths
-PG_CPPFLAGS += -Iinclude/pisa_integration
-
 SHLIB_LINK = $(libpq)
 
 include $(OSS_SRC_DIR)/Makefile.global

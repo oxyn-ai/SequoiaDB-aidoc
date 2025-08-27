@@ -7,7 +7,7 @@
 #include "nodes/nodeFuncs.h"
 #include "catalog/pg_type.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "opclass/bson_text_pisa.h"
 #include "opclass/bson_text_gin.h"
 #include "pisa_integration/pisa_integration.h"
@@ -39,7 +39,6 @@ ExecutePisaTextQuery(const char *database_name, const char *collection_name,
 {
     PisaQueryContext *context;
     List *results = NIL;
-    List *pisa_results;
     ListCell *cell;
 
     if (!pisa_integration_enabled)
@@ -54,9 +53,9 @@ ExecutePisaTextQuery(const char *database_name, const char *collection_name,
 
     PG_TRY();
     {
-        pisa_results = ExecutePisaTextSearch(context);
+        List *tmp_pisa = ExecutePisaTextSearch(context);
         
-        foreach(cell, pisa_results)
+        foreach(cell, tmp_pisa)
         {
             PisaTextSearchResult *pisa_result = (PisaTextSearchResult *) lfirst(cell);
             results = lappend(results, pisa_result);
@@ -75,24 +74,27 @@ ExecutePisaTextQuery(const char *database_name, const char *collection_name,
     return results;
 }
 
+#ifndef DISABLE_PISA_HYBRID
 List *
 ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
 {
-    List *pisa_results = NIL;
-    List *documentdb_results = NIL;
-    List *combined_results = NIL;
-
     if (!pisa_integration_enabled || context == NULL)
         return NIL;
 
+    volatile List *final_results = NIL;
+
     PG_TRY();
     {
+        List *pisa_results = NIL;
+        List *documentdb_results = NIL;
+        List *combined_results = NIL;
+
         if (context->use_pisa_text && context->text_query != NULL)
         {
-            pisa_results = ExecutePisaTextQuery(context->database_name, 
-                                              context->collection_name,
-                                              context->text_query, 
-                                              context->limit * 2);
+            pisa_results = ExecutePisaTextQuery(context->database_name,
+                                                context->collection_name,
+                                                context->text_query,
+                                                context->limit * 2);
         }
 
         if (context->use_documentdb_vector || context->filter_criteria != NULL)
@@ -100,25 +102,34 @@ ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
             documentdb_results = NIL;
         }
 
-        combined_results = CombinePisaAndDocumentDBResults(pisa_results, 
-                                                          documentdb_results,
-                                                          context->sort_criteria, 
-                                                          context->limit);
+        combined_results = CombinePisaAndDocumentDBResults(pisa_results,
+                                                           documentdb_results,
+                                                           context->sort_criteria,
+                                                           context->limit);
 
-        elog(DEBUG1, "Hybrid query returned %d results (PISA: %d, DocumentDB: %d)", 
-             list_length(combined_results), 
-             list_length(pisa_results), 
+        elog(DEBUG1, "Hybrid query returned %d results (PISA: %d, DocumentDB: %d)",
+             list_length(combined_results),
+             list_length(pisa_results),
              list_length(documentdb_results));
+
+        final_results = combined_results;
     }
     PG_CATCH();
     {
         elog(WARNING, "Hybrid PISA query failed");
-        combined_results = NIL;
+        final_results = NIL;
     }
     PG_END_TRY();
 
-    return combined_results;
+    return (List *) final_results;
 }
+#else
+List *
+ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
+{
+    return NIL;
+}
+#endif
 
 bool
 CreatePisaTextIndex(const char *database_name, const char *collection_name,
@@ -189,8 +200,7 @@ OptimizePisaTextIndex(const char *database_name, const char *collection_name)
 
     elog(LOG, "Optimizing PISA text index for %s.%s", database_name, collection_name);
 
-    return BuildCompletePisaIndex(database_name, collection_name, 
-                                 pisa_index_base_path, pisa_default_compression);
+    return CreatePisaIndex(database_name, collection_name, pisa_default_compression);
 }
 
 double
