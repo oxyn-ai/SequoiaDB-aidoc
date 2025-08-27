@@ -15,7 +15,7 @@
 #include "nodes/primnodes.h"
 #include "tsearch/ts_type.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "opclass/bson_text_gin.h"
 #include "pisa_integration/pisa_integration.h"
 

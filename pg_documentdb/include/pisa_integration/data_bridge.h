@@ -2,7 +2,7 @@
 
 #include "postgres.h"
 #include "utils/builtins.h"
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 
 typedef struct PisaDocument
 {

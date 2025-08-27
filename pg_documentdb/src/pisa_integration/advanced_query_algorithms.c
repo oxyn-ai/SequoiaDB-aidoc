@@ -5,7 +5,7 @@
 #include "utils/array.h"
 #include "catalog/pg_type.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "pisa_integration/advanced_query_algorithms.h"
 #include "pisa_integration/pisa_integration.h"
 #include "pisa_integration/data_bridge.h"

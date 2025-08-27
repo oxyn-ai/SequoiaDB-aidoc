@@ -15,7 +15,7 @@
 #include "nodes/primnodes.h"
 #include "utils/array.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "pisa_integration/pisa_integration.h"
 
 typedef enum PisaQueryAlgorithm

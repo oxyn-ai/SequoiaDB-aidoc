@@ -6,7 +6,7 @@
 #include "catalog/pg_type.h"
 #include "access/htup_details.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "io/bson_traversal.h"
 #include "pisa_integration/data_bridge.h"
 #include "metadata/collection.h"

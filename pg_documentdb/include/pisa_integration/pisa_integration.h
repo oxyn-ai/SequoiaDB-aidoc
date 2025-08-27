@@ -6,7 +6,7 @@
 #include "utils/jsonb.h"
 #include "catalog/pg_type.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "utils/documentdb_errors.h"
 
 typedef struct PisaIndexConfig

@@ -7,7 +7,7 @@
 #include "postmaster/bgworker.h"
 #include "miscadmin.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "pisa_integration/document_reordering.h"
 #include "pisa_integration/pisa_integration.h"
 #include "pisa_integration/data_bridge.h"

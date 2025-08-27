@@ -15,7 +15,7 @@
 #include "storage/lwlock.h"
 #include "postmaster/bgworker.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "pisa_integration/pisa_integration.h"
 
 typedef struct DocumentReorderingTask

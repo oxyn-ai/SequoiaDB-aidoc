@@ -7,7 +7,7 @@
 #include "access/htup_details.h"
 #include "executor/spi.h"
 
-#include "io/pgbson.h"
+#include "io/bson_core.h"
 #include "io/bson_traversal.h"
 #include "pisa_integration/data_bridge.h"
 #include "pisa_integration/pisa_integration.h"
