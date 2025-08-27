@@ -13,9 +13,10 @@ typedef struct PisaQueryContext
 {
     const char *database_name;
     const char *collection_name;
-    const char *text_query;
-    void *additional_criteria;
+    char *query_text;
     int limit;
+    bool use_pisa;
+    void *additional_criteria;
 } PisaQueryContext;
 
 static inline bool PisaIntegrationEnabled(void) { return false; }
@@ -59,9 +60,10 @@ typedef struct PisaQueryContext
 {
     const char *database_name;
     const char *collection_name;
-    const char *text_query;
-    Jsonb *additional_criteria;
+    char *query_text;
     int limit;
+    bool use_pisa;
+    Jsonb *additional_criteria;
 } PisaQueryContext;
 
 extern bool pisa_integration_enabled;
