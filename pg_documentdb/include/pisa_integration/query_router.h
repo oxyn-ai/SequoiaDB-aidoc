@@ -1,3 +1,16 @@
+#ifdef DISABLE_PISA
+#include "nodes/pg_list.h"
+#include "io/bson_core.h"
+#include "pisa_integration/pisa_integration.h"
+
+typedef struct PisaQueryPlan PisaQueryPlan;
+
+static inline PisaQueryPlan *PlanPisaQuery(const char *database_name, const char *collection_name, const char *query_json, int limit) { return NULL; }
+static inline List *ExecutePisaPlannedQuery(PisaQueryPlan *plan) { return NIL; }
+#endif
+#else
+
+
 #pragma once
 
 #include "postgres.h"
@@ -46,3 +59,4 @@ double EstimateQueryCost(const char *query_json, bool use_pisa);
 
 void FreeQueryRoutingDecision(QueryRoutingDecision *decision);
 void FreeHybridQueryPlan(HybridQueryPlan *plan);
+#endif

@@ -1,3 +1,14 @@
+#ifdef DISABLE_PISA
+#include "nodes/pg_list.h"
+#include "pisa_integration/pisa_integration.h"
+
+static inline List *ExecutePisaWandQuery(PisaQueryContext *context) { return NIL; }
+static inline List *ExecutePisaBM25Query(PisaQueryContext *context) { return NIL; }
+static inline List *ExecutePisaHybridWandQuery(PisaQueryContext *context) { return NIL; }
+#endif
+#else
+
+
 /*-------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation.  All rights reserved.
  *
@@ -102,4 +113,5 @@ bool ShouldUseBlockMaxOptimization(List *query_terms, int expected_results);
 void FreePisaAdvancedQueryContext(PisaAdvancedQueryContext *context);
 void FreePisaQueryExecutionPlan(PisaQueryExecutionPlan *plan);
 
+#endif
 #endif

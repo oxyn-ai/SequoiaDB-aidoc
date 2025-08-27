@@ -1,3 +1,14 @@
+#ifdef DISABLE_PISA
+#include "postgres.h"
+#include "nodes/pg_list.h"
+#include "io/bson_core.h"
+#include "pisa_integration/data_bridge.h"
+
+List *ExportCollectionToPisa(const char *database_name, const char *collection_name, int mode) { return NIL; }
+#else
+#else
+
+
 #include "postgres.h"
 #include "fmgr.h"
 #include "utils/builtins.h"
@@ -360,3 +371,4 @@ GetModifiedDocumentsFromCollection(const char *database_name, const char *collec
 {
     return NIL;
 }
+#endif

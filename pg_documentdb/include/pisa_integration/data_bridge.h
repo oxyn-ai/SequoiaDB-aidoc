@@ -1,3 +1,12 @@
+#ifdef DISABLE_PISA
+#include "nodes/pg_list.h"
+#include "io/bson_core.h"
+
+static inline List *ExportCollectionToPisa(const char *database_name, const char *collection_name, int mode) { return NIL; }
+#endif
+
+#else
+
 #pragma once
 
 #include "postgres.h"
@@ -39,3 +48,4 @@ char *GeneratePisaDocumentId(const pgbson *document, int64 collection_id);
 
 void FreePisaDocument(PisaDocument *doc);
 void FreePisaCollection(PisaCollection *collection);
+#endif

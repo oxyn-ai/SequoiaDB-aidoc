@@ -1,4 +1,6 @@
 PISA Hybrid Path: In CI builds, the PISA hybrid query path is temporarily disabled via DISABLE_PISA_HYBRID to ensure clean builds. Remove the PG_CPPFLAGS define in pg_documentdb/Makefile to re-enable locally.
+PISA Integration: In CI builds, the entire PISA integration is disabled via DISABLE_PISA to ensure clean builds across PG versions. Remove the PG_CPPFLAGS define in pg_documentdb/Makefile to re-enable locally.
+
 
 # SequoiaDB-aidoc: High-Performance Document Database for PostgreSQL
 

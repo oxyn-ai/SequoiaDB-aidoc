@@ -1,3 +1,30 @@
+#ifdef DISABLE_PISA
+#include "nodes/pg_list.h"
+#include "io/bson_core.h"
+
+typedef enum PisaCompressionType
+{
+    PISA_COMPRESSION_DEFAULT = 0
+} PisaCompressionType;
+
+typedef struct PisaQueryContext
+{
+    char *database_name;
+    char *collection_name;
+    char *text_query;
+    pgbson *filter_criteria;
+    int limit;
+} PisaQueryContext;
+
+static inline bool PisaIntegrationEnabled(void) { return false; }
+static inline List *ExecutePisaTextSearch(PisaQueryContext *context) { return NIL; }
+static inline bool CreatePisaTextIndex(const char *database_name, const char *collection_name, bytea *indexOptions, PisaCompressionType compression_type) { return false; }
+static inline bool UpdatePisaTextIndex(const char *database_name, const char *collection_name, bytea *indexOptions) { return false; }
+static inline bool OptimizePisaTextIndex(const char *database_name, const char *collection_name) { return false; }
+#endif
+#else
+
+
 #pragma once
 
 #include "postgres.h"
@@ -56,3 +83,4 @@ char *ConvertBsonToPisaFormat(const pgbson *document);
 pgbson *ConvertPisaResultToBson(const char *pisa_result);
 
 void RegisterPisaConfigurationParameters(void);
+#endif

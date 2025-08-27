@@ -1,3 +1,27 @@
+#ifdef DISABLE_PISA
+#include "postgres.h"
+#include "nodes/pg_list.h"
+#include "io/bson_core.h"
+#include "pisa_integration/pisa_integration.h"
+
+bool pisa_integration_enabled = false;
+char *pisa_index_base_path = NULL;
+int pisa_default_compression = 0;
+
+void InitializePisaIntegration(void) {}
+void ShutdownPisaIntegration(void) {}
+bool CreatePisaIndex(const char *database_name, const char *collection_name, PisaCompressionType compression_type) { return false; }
+bool UpdatePisaIndex(const char *database_name, const char *collection_name, const pgbson *document, bool is_delete) { return false; }
+bool DropPisaIndex(const char *database_name, const char *collection_name) { return false; }
+List *ExecutePisaTextSearch(PisaQueryContext *context) { return NIL; }
+bool ShouldUsePisaForQuery(const char *query_json) { return false; }
+char *ConvertBsonToPisaFormat(const pgbson *document) { return NULL; }
+pgbson *ConvertPisaResultToBson(const char *pisa_result) { return NULL; }
+void RegisterPisaConfigurationParameters(void) {}
+#else
+#else
+
+
 #include "postgres.h"
 #include "fmgr.h"
 #include "utils/guc.h"
@@ -232,3 +256,4 @@ RegisterPisaConfigurationParameters(void)
                            NULL,
                            NULL);
 }
+#endif
