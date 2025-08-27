@@ -1,3 +1,5 @@
+PG_CPPFLAGS += -DDISABLE_PISA_HYBRID
+
 EXTENSION = documentdb
 MODULE_big = pg_$(EXTENSION)
 

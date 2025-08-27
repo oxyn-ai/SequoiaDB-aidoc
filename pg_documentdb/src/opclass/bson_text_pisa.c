@@ -74,6 +74,7 @@ ExecutePisaTextQuery(const char *database_name, const char *collection_name,
     return results;
 }
 
+#ifndef DISABLE_PISA_HYBRID
 List *
 ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
 {
@@ -122,6 +123,13 @@ ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
 
     return (List *) final_results;
 }
+#else
+List *
+ExecuteHybridPisaQuery(PisaHybridQueryContext *context)
+{
+    return NIL;
+}
+#endif
 
 bool
 CreatePisaTextIndex(const char *database_name, const char *collection_name,
