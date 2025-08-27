@@ -14,10 +14,15 @@ $$;
 
 CREATE OR REPLACE FUNCTION documentdb_docsql.drop_database(dbname text)
 RETURNS void
-LANGUAGE SQL
-AS $$
-SELECT documentdb_api.drop_database(dbname);
-$$;
+LANGUAGE plpgsql
+AS $func$
+DECLARE
+  schemaname text := format('docsql_%s', dbname);
+BEGIN
+  EXECUTE format('DROP SCHEMA IF EXISTS %I CASCADE', schemaname);
+  PERFORM documentdb_api.drop_database(dbname);
+END;
+$func$;
 
 CREATE OR REPLACE FUNCTION documentdb_docsql.create_collection(dbname text, collname text)
 RETURNS void

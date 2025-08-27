@@ -189,11 +189,19 @@ sudo make install
 
 ### Pure SQL Interface (docsql)
 
-- Install extension:
+- Install:
+  CREATE EXTENSION pg_documentdb;
   CREATE EXTENSION pg_documentdb_docsql;
 
-- Check version:
-  SELECT documentdb_docsql.version();
+- Quick start:
+  SELECT documentdb_docsql.create_database('demo');
+  SELECT documentdb_docsql.create_collection('demo','items');
+  INSERT INTO docsql_demo.items(document) VALUES ('{ "_id":"i1","name":"foo" }');
+  SELECT (document->>'_id') AS id, (document->>'name') AS name FROM docsql_demo.items ORDER BY id;
+
+- Cleanup:
+  SELECT documentdb_docsql.drop_collection('demo','items');
+  SELECT documentdb_docsql.drop_database('demo');
 
 ### Connecting to the Server
 

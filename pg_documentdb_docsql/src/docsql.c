@@ -5,6 +5,9 @@
 #include "nodes/parsenodes.h"
 #include "utils/builtins.h"
 #include "catalog/namespace.h"
+#include "lib/stringinfo.h"
+#include "parser/parser.h"
+#include "tcop/tcopprot.h"
 
 PG_MODULE_MAGIC;
 
@@ -32,15 +35,10 @@ docsql_ProcessUtility(PlannedStmt *pstmt,
 			initStringInfo(&buf);
 			appendStringInfo(&buf, "SELECT documentdb_docsql.create_database(%s)",
 							 quote_literal_cstr(db));
-			Portal portal = NULL;
-			List *querytree_list;
-			List *plantree_list;
 
-			querytree_list = raw_parser(buf.data, RAW_PARSE_DEFAULT);
-			plantree_list = pg_plan_queries(querytree_list, queryString, 0, params);
+			List *querytree_list = raw_parser(buf.data, RAW_PARSE_DEFAULT);
+			List *plantree_list = pg_plan_queries(querytree_list, buf.data, 0, params);
 
-			ProcessUtilityResult res;
-			(void) res;
 			if (prev_ProcessUtility)
 				prev_ProcessUtility((PlannedStmt *) linitial(plantree_list), buf.data, false,
 									PROCESS_UTILITY_TOPLEVEL, params, NULL, dest, qc);
