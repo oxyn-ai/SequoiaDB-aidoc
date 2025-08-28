@@ -17,7 +17,6 @@
 #include "nodes/params.h"
 
 #include "metadata/collection.h"
-#include "io/bson_core.h"
 
 /*
  * Query type enumeration for routing different query types
