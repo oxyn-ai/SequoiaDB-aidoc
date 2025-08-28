@@ -18,6 +18,7 @@
 #include "documentdb_api_init.h"
 #include "metadata/metadata_guc.h"
 #include "planner/documentdb_planner.h"
+#include "planner/sql_query_router.h"
 #include "customscan/custom_scan_registrations.h"
 #include "commands/connection_management.h"
 #include "utils/feature_counter.h"
@@ -103,6 +104,9 @@ InstallDocumentDBApiPostgresHooks(void)
 	LoadRumRoutine();
 
 	SetupCursorStorage();
+
+	/* Initialize SQL query router */
+	InitializeSQLQueryRouter();
 }
 
 
@@ -155,6 +159,9 @@ UninstallDocumentDBApiPostgresHooks(void)
 
 	UnregisterXactCallback(DocumentDBTransactionCallback, NULL);
 	UnregisterSubXactCallback(DocumentDBSubTransactionCallback, NULL);
+
+	/* Cleanup SQL query router */
+	CleanupSQLQueryRouter();
 }
 
 

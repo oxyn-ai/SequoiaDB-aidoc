@@ -37,6 +37,7 @@
 #include "metadata/collection.h"
 #include "metadata/metadata_cache.h"
 #include "planner/documentdb_planner.h"
+#include "planner/sql_query_router.h"
 #include "query/query_operator.h"
 #include "opclass/bson_index_support.h"
 #include "opclass/bson_gin_index_mgmt.h"
@@ -59,7 +60,8 @@ typedef enum MongoQueryFlag
 	HAS_CURSOR_FUNC = 1 << 4,
 	HAS_AGGREGATION_FUNCTION = 1 << 5,
 	HAS_NESTED_AGGREGATION_FUNCTION = 1 << 6,
-	HAS_QUERY_MATCH_FUNCTION = 1 << 7
+	HAS_QUERY_MATCH_FUNCTION = 1 << 7,
+	HAS_SQL_ON_DOCUMENTS = 1 << 8
 } MongoQueryFlag;
 
 typedef struct ReplaceMongoCollectionContext
@@ -140,6 +142,12 @@ DocumentDBApiPlanner(Query *parse, const char *queryString, int cursorOptions,
 		if (parse->commandType != CMD_INSERT)
 		{
 			queryFlags = MongoQueryFlags(parse);
+		}
+
+		/* Handle SQL queries on DocumentDB collections */
+		if (queryFlags & HAS_SQL_ON_DOCUMENTS)
+		{
+			return ProcessSQLOnDocumentsQuery(parse, queryString, cursorOptions, boundParams);
 		}
 
 		if (queryFlags & HAS_AGGREGATION_FUNCTION)
@@ -820,6 +828,16 @@ MongoQueryFlagsWalker(Node *node, MongoQueryFlagsState *queryFlags)
 		if (IsMongoCollectionBasedRTE(rte))
 		{
 			queryFlags->mongoQueryFlags |= HAS_MONGO_COLLECTION_RTE;
+		}
+		else if (rte->rtekind == RTE_RELATION)
+		{
+			/* Check if this is a direct SQL query on a DocumentDB data table */
+			char *tableName = get_rel_name(rte->relid);
+			if (tableName && strncmp(tableName, DOCUMENT_DATA_TABLE_NAME_PREFIX, 
+									strlen(DOCUMENT_DATA_TABLE_NAME_PREFIX)) == 0)
+			{
+				queryFlags->mongoQueryFlags |= HAS_SQL_ON_DOCUMENTS;
+			}
 		}
 		else if (rte->rtekind == RTE_FUNCTION &&
 				 list_length(rte->functions) == 1)

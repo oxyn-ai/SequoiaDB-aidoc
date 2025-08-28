@@ -53,6 +53,9 @@ PISA_INTEGRATION_SOURCES = \
 
 SOURCES += $(PISA_INTEGRATION_SOURCES)
 
+# Ensure SQL query router is included
+SOURCES += src/planner/sql_query_router.c
+
 OBJS = $(patsubst %.c,%.o,$(SOURCES))
 
 DEBUG ?= no
