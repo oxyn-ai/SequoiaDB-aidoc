@@ -14,7 +14,7 @@
 #include "postgres.h"
 #include "nodes/plannodes.h"
 #include "nodes/parsenodes.h"
-#include "tcop/params.h"
+#include "nodes/params.h"
 
 /*
  * Query type enumeration for routing different query types

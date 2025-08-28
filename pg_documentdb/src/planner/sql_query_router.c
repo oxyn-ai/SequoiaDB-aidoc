@@ -18,7 +18,7 @@
 #include "nodes/plannodes.h"
 #include "optimizer/planner.h"
 #include "parser/parse_relation.h"
-#include "tcop/params.h"
+#include "nodes/params.h"
 #include "utils/builtins.h"
 #include "utils/hsearch.h"
 #include "utils/memutils.h"
